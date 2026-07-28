@@ -46,6 +46,8 @@ export class ReceiptService {
       } catch (error) {
         console.error('[ReceiptService] Desktop sales summary printing threw an error.', error);
       }
+
+      return false;
     }
 
     return this.printSalesSummaryWithBrowser({ printer, report });
@@ -65,6 +67,8 @@ export class ReceiptService {
       } catch (error) {
         console.error('[ReceiptService] Desktop printing threw an error.', error);
       }
+
+      return false;
     }
 
     return this.printWithBrowser(kind, order, printer);

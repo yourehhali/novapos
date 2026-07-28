@@ -171,7 +171,7 @@ const DEMO_PRINTERS: PrinterConfig[] = [
     charactersPerLine: 42,
     printMode: 'THERMAL',
     silent: true,
-    systemPrinterName: 'COUNTER-01',
+    systemPrinterName: 'EPSON TM-T20II Receipt',
   },
   {
     id: 'kitchen-hot',
@@ -183,7 +183,7 @@ const DEMO_PRINTERS: PrinterConfig[] = [
     charactersPerLine: 42,
     printMode: 'THERMAL',
     silent: true,
-    systemPrinterName: 'KITCHEN-HOT-01',
+    systemPrinterName: 'EPSON TM-T20II Receipt',
   },
 ];
 

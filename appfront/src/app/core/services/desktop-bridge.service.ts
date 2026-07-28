@@ -10,7 +10,15 @@ import {
 @Injectable({ providedIn: 'root' })
 export class DesktopBridgeService {
   isDesktop(): boolean {
-    return typeof window !== 'undefined' && typeof window.novaPosDesktop !== 'undefined';
+    if (typeof window === 'undefined') {
+      return false;
+    }
+
+    if (typeof window.novaPosDesktop !== 'undefined') {
+      return true;
+    }
+
+    return /Electron/i.test(window.navigator.userAgent);
   }
 
   async getRuntimeInfo(): Promise<DesktopRuntimeInfo | null> {
