@@ -47,7 +47,7 @@ export class ReceiptService {
         console.error('[ReceiptService] Desktop sales summary printing threw an error.', error);
       }
 
-      return false;
+      return this.printSalesSummaryWithBrowser({ printer, report });
     }
 
     return this.printSalesSummaryWithBrowser({ printer, report });
@@ -68,7 +68,7 @@ export class ReceiptService {
         console.error('[ReceiptService] Desktop printing threw an error.', error);
       }
 
-      return false;
+      return this.printWithBrowser(kind, order, printer);
     }
 
     return this.printWithBrowser(kind, order, printer);
@@ -126,6 +126,7 @@ export class ReceiptService {
     printer?: PrinterConfig,
   ): string {
     const paperWidthMm = printer?.paperWidthMm ?? 80;
+    const pageHeightMm = this.estimateBrowserTicketHeightMm(kind, order, printer);
     const widthCss = paperWidthMm <= 58 ? '54mm' : '74mm';
     const printedAt =
       kind === 'KITCHEN'
@@ -178,7 +179,7 @@ export class ReceiptService {
           <title>${kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</title>
           <style>
             @page {
-              size: ${paperWidthMm}mm auto;
+              size: ${paperWidthMm}mm ${pageHeightMm}mm;
               margin: 0;
             }
 
@@ -318,6 +319,7 @@ export class ReceiptService {
 
   private buildBrowserSalesSummaryHtml(request: PrintSalesSummaryRequest): string {
     const paperWidthMm = request.printer?.paperWidthMm ?? 80;
+    const pageHeightMm = this.estimateBrowserSalesSummaryHeightMm(request);
     const widthCss = paperWidthMm <= 58 ? '54mm' : '74mm';
     const lineRows = request.report.entries.length > 0
       ? request.report.entries
@@ -345,7 +347,7 @@ export class ReceiptService {
           <title>Total Journalier</title>
           <style>
             @page {
-              size: ${paperWidthMm}mm auto;
+              size: ${paperWidthMm}mm ${pageHeightMm}mm;
               margin: 0;
             }
 
@@ -486,6 +488,42 @@ export class ReceiptService {
         </body>
       </html>
     `;
+  }
+
+  private estimateBrowserTicketHeightMm(
+    kind: TicketKind,
+    order: CompletedOrder,
+    printer?: PrinterConfig,
+  ): number {
+    const paperWidthMm = printer?.paperWidthMm ?? 80;
+    const charsPerLine = printer?.charactersPerLine ?? (paperWidthMm <= 58 ? 28 : 42);
+    const reservedChars = kind === 'KITCHEN' ? 5 : 12;
+    const itemChars = Math.max(12, charsPerLine - reservedChars);
+    const wrappedLineCount = order.lines.reduce((total, line) => {
+      const normalizedLength = line.name.trim().length || 1;
+      return total + Math.max(1, Math.ceil(normalizedLength / itemChars));
+    }, 0);
+    const headerLines = kind === 'KITCHEN' ? 4 : 5;
+    const footerLines = kind === 'KITCHEN' ? 1 : 2;
+    const totalTextLines = headerLines + footerLines + wrappedLineCount;
+    const heightMm = paperWidthMm <= 58
+      ? 10 + totalTextLines * 3.8
+      : 12 + totalTextLines * 3.6;
+
+    return Math.max(36, Math.min(160, Math.ceil(heightMm)));
+  }
+
+  private estimateBrowserSalesSummaryHeightMm(request: PrintSalesSummaryRequest): number {
+    const paperWidthMm = request.printer?.paperWidthMm ?? 80;
+    const headerLines = 11;
+    const footerLines = 4;
+    const bodyLines = Math.max(2, request.report.entries.length) + 3;
+    const totalLines = headerLines + footerLines + bodyLines;
+    const heightMm = paperWidthMm <= 58
+      ? 22 + totalLines * 4.6
+      : 24 + totalLines * 4.2;
+
+    return Math.max(80, Math.min(320, Math.ceil(heightMm)));
   }
 
   private formatDateTime(value: string): string {
