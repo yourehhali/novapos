@@ -301,20 +301,20 @@ function estimateTicketHeightMm(request: PrintTicketRequest): number {
   const paperWidthMm = request.printer?.paperWidthMm ?? 80;
   const charsPerLine =
     request.printer?.charactersPerLine ?? (paperWidthMm <= 58 ? 28 : 42);
-  const reservedChars = request.kind === 'KITCHEN' ? 6 : 14;
+  const reservedChars = request.kind === 'KITCHEN' ? 5 : 12;
   const itemChars = Math.max(12, charsPerLine - reservedChars);
   const wrappedLineCount = request.order.lines.reduce((total, line) => {
     const normalizedLength = line.name.trim().length || 1;
     return total + Math.max(1, Math.ceil(normalizedLength / itemChars));
   }, 0);
-  const headerLines = request.kind === 'KITCHEN' ? 8 : 10;
-  const footerLines = request.kind === 'KITCHEN' ? 4 : 6;
+  const headerLines = request.kind === 'KITCHEN' ? 4 : 5;
+  const footerLines = request.kind === 'KITCHEN' ? 1 : 2;
   const totalTextLines = headerLines + footerLines + wrappedLineCount;
   const heightMm = paperWidthMm <= 58
-    ? 18 + totalTextLines * 4.3
-    : 20 + totalTextLines * 4.0;
+    ? 10 + totalTextLines * 3.8
+    : 12 + totalTextLines * 3.6;
 
-  return Math.max(58, Math.min(220, Math.ceil(heightMm)));
+  return Math.max(36, Math.min(160, Math.ceil(heightMm)));
 }
 
 function mapWidthToWindowPx(paperWidthMm: number): number {
@@ -376,8 +376,8 @@ function buildTicketHtml(request: PrintTicketRequest): string {
       : `
         <div class="divider"></div>
         <div class="summary-row meta-row">
-          <span>Articles</span>
-          <span>${request.order.lineCount} lignes</span>
+          <span>Lignes</span>
+          <span>${request.order.lineCount}</span>
         </div>
       `;
 
@@ -405,31 +405,32 @@ function buildTicketHtml(request: PrintTicketRequest): string {
           }
 
           body {
-            padding: 3mm;
+            padding: 1.5mm 2mm 2mm;
             font-size: ${request.kind === 'KITCHEN' ? '11px' : '10px'};
             line-height: 1.2;
           }
 
           .header {
             text-align: center;
-            margin-bottom: 8px;
+            margin-bottom: 4px;
           }
 
           .header h1 {
-            margin: 0 0 3px;
-            font-size: ${request.kind === 'KITCHEN' ? '18px' : '16px'};
+            margin: 0 0 1px;
+            font-size: ${request.kind === 'KITCHEN' ? '15px' : '14px'};
             letter-spacing: 0.02em;
             text-transform: uppercase;
           }
 
           .meta {
             display: grid;
-            gap: 2px;
+            gap: 1px;
+            font-size: 9px;
           }
 
           .divider {
             border-top: 1px dashed #222222;
-            margin: 6px 0;
+            margin: 4px 0;
           }
 
           table {
@@ -439,7 +440,7 @@ function buildTicketHtml(request: PrintTicketRequest): string {
           }
 
           th, td {
-            padding: 2px 0;
+            padding: 1px 0;
             vertical-align: top;
           }
 
@@ -468,22 +469,16 @@ function buildTicketHtml(request: PrintTicketRequest): string {
             display: flex;
             justify-content: space-between;
             gap: 8px;
-            margin: 2px 0;
+            margin: 1px 0;
           }
 
           .summary-row strong {
-            font-size: 12px;
+            font-size: 11px;
           }
 
           .meta-row {
             font-size: 9px;
             color: #333333;
-          }
-
-          .footer {
-            margin-top: 6px;
-            text-align: center;
-            font-size: 9px;
           }
         </style>
       </head>
@@ -491,8 +486,7 @@ function buildTicketHtml(request: PrintTicketRequest): string {
         <div class="header">
           <h1>${request.kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</h1>
           <div class="meta">
-            <div>Commande ${escapeHtml(request.order.orderNumber)}</div>
-            <div>Caissier ${escapeHtml(request.order.cashierName)}</div>
+            <div>${escapeHtml(request.order.orderNumber)}</div>
             <div>${request.kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${escapeHtml(printedAt)}</div>
           </div>
         </div>
@@ -510,11 +504,6 @@ function buildTicketHtml(request: PrintTicketRequest): string {
           </tbody>
         </table>
         ${totalBlock}
-        <div class="footer">
-          ${request.kind === 'KITCHEN'
-            ? 'Preparation locale sans interruption.'
-            : 'Impression locale depuis le poste de caisse.'}
-        </div>
       </body>
     </html>
   `;

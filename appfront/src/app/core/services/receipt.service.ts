@@ -161,8 +161,8 @@ export class ReceiptService {
         : `
           <div class="divider"></div>
           <div class="summary-row meta-row">
-            <span>Articles</span>
-            <span>${order.lineCount} lignes</span>
+            <span>Lignes</span>
+            <span>${order.lineCount}</span>
           </div>
         `;
 
@@ -188,30 +188,31 @@ export class ReceiptService {
             }
 
             body {
-              padding: 3mm;
+              padding: 1.5mm 2mm 2mm;
               font-size: ${kind === 'KITCHEN' ? '11px' : '10px'};
               line-height: 1.2;
             }
 
             .header {
               text-align: center;
-              margin-bottom: 8px;
+              margin-bottom: 4px;
             }
 
             .header h1 {
-              margin: 0 0 3px;
-              font-size: ${kind === 'KITCHEN' ? '18px' : '16px'};
+              margin: 0 0 1px;
+              font-size: ${kind === 'KITCHEN' ? '15px' : '14px'};
               text-transform: uppercase;
             }
 
             .meta {
               display: grid;
-              gap: 2px;
+              gap: 1px;
+              font-size: 9px;
             }
 
             .divider {
               border-top: 1px dashed #222222;
-              margin: 6px 0;
+              margin: 4px 0;
             }
 
             table {
@@ -221,7 +222,7 @@ export class ReceiptService {
             }
 
             th, td {
-              padding: 2px 0;
+              padding: 1px 0;
               vertical-align: top;
             }
 
@@ -250,22 +251,16 @@ export class ReceiptService {
               display: flex;
               justify-content: space-between;
               gap: 8px;
-              margin: 2px 0;
+              margin: 1px 0;
             }
 
             .summary-row strong {
-              font-size: 12px;
+              font-size: 11px;
             }
 
             .meta-row {
               font-size: 9px;
               color: #333333;
-            }
-
-            .footer {
-              margin-top: 6px;
-              text-align: center;
-              font-size: 9px;
             }
           </style>
         </head>
@@ -273,8 +268,7 @@ export class ReceiptService {
           <div class="header">
             <h1>${kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</h1>
             <div class="meta">
-              <div>Commande ${this.escapeHtml(order.orderNumber)}</div>
-              <div>Caissier ${this.escapeHtml(order.cashierName)}</div>
+              <div>${this.escapeHtml(order.orderNumber)}</div>
               <div>${kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${this.escapeHtml(printedAt)}</div>
             </div>
           </div>
@@ -292,11 +286,6 @@ export class ReceiptService {
             </tbody>
           </table>
           ${summaryBlock}
-          <div class="footer">
-            ${kind === 'KITCHEN'
-              ? 'Preparation locale sans interruption.'
-              : 'Impression locale depuis le poste de caisse.'}
-          </div>
           <script>
             window.addEventListener('load', () => {
               window.print();
@@ -351,30 +340,31 @@ export class ReceiptService {
             }
 
             body {
-              padding: 3mm;
+              padding: 1.5mm 2mm 2mm;
               font-size: 10px;
               line-height: 1.2;
             }
 
             .header {
               text-align: center;
-              margin-bottom: 8px;
+              margin-bottom: 4px;
             }
 
             .header h1 {
-              margin: 0 0 3px;
-              font-size: 16px;
+              margin: 0 0 1px;
+              font-size: 14px;
               text-transform: uppercase;
             }
 
             .meta {
               display: grid;
-              gap: 2px;
+              gap: 1px;
+              font-size: 9px;
             }
 
             .divider {
               border-top: 1px dashed #222222;
-              margin: 6px 0;
+              margin: 4px 0;
             }
 
             table {
@@ -384,7 +374,7 @@ export class ReceiptService {
             }
 
             th, td {
-              padding: 2px 0;
+              padding: 1px 0;
               vertical-align: top;
             }
 
@@ -413,17 +403,11 @@ export class ReceiptService {
               display: flex;
               justify-content: space-between;
               gap: 8px;
-              margin: 2px 0;
+              margin: 1px 0;
             }
 
             .summary-row strong {
-              font-size: 12px;
-            }
-
-            .footer {
-              margin-top: 6px;
-              text-align: center;
-              font-size: 9px;
+              font-size: 11px;
             }
           </style>
         </head>
@@ -458,9 +442,6 @@ export class ReceiptService {
           <div class="summary-row">
             <span>Total cumule</span>
             <strong>${this.formatMoney(request.report.grandTotal, request.report.currency)}</strong>
-          </div>
-          <div class="footer">
-            Impression locale depuis le poste de caisse.
           </div>
           <script>
             window.addEventListener('load', () => {
