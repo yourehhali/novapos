@@ -179,18 +179,31 @@ export class ReceiptService {
             }
 
             html, body {
-              margin: 0;
-              padding: 0;
+              margin: 0 !important;
+              padding: 0 !important;
               background: #ffffff;
               color: #111111;
               font-family: "SF Mono", "Menlo", "Consolas", monospace;
               width: ${widthCss};
+              min-height: 0;
+              height: auto;
             }
 
             body {
-              padding: 1.5mm 2mm 2mm;
+              display: flex;
+              align-items: flex-start;
+              justify-content: flex-start;
+              padding: 0;
               font-size: ${kind === 'KITCHEN' ? '11px' : '10px'};
               line-height: 1.2;
+              overflow: hidden;
+            }
+
+            .ticket-root {
+              width: ${widthCss};
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0.6mm 2mm 2mm;
             }
 
             .header {
@@ -265,27 +278,29 @@ export class ReceiptService {
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>${kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</h1>
-            <div class="meta">
-              <div>${this.escapeHtml(order.orderNumber)}</div>
-              <div>${kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${this.escapeHtml(printedAt)}</div>
+          <div class="ticket-root">
+            <div class="header">
+              <h1>${kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</h1>
+              <div class="meta">
+                <div>${this.escapeHtml(order.orderNumber)}</div>
+                <div>${kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${this.escapeHtml(printedAt)}</div>
+              </div>
             </div>
+            <div class="divider"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="qty">Qte</th>
+                  <th class="item">Article</th>
+                  ${kind === 'PAYMENT' ? '<th class="price">Prix</th>' : ''}
+                </tr>
+              </thead>
+              <tbody>
+                ${lineRows}
+              </tbody>
+            </table>
+            ${summaryBlock}
           </div>
-          <div class="divider"></div>
-          <table>
-            <thead>
-              <tr>
-                <th class="qty">Qte</th>
-                <th class="item">Article</th>
-                ${kind === 'PAYMENT' ? '<th class="price">Prix</th>' : ''}
-              </tr>
-            </thead>
-            <tbody>
-              ${lineRows}
-            </tbody>
-          </table>
-          ${summaryBlock}
           <script>
             window.addEventListener('load', () => {
               window.print();
@@ -331,18 +346,31 @@ export class ReceiptService {
             }
 
             html, body {
-              margin: 0;
-              padding: 0;
+              margin: 0 !important;
+              padding: 0 !important;
               background: #ffffff;
               color: #111111;
               font-family: "SF Mono", "Menlo", "Consolas", monospace;
               width: ${widthCss};
+              min-height: 0;
+              height: auto;
             }
 
             body {
-              padding: 1.5mm 2mm 2mm;
+              display: flex;
+              align-items: flex-start;
+              justify-content: flex-start;
+              padding: 0;
               font-size: 10px;
               line-height: 1.2;
+              overflow: hidden;
+            }
+
+            .ticket-root {
+              width: ${widthCss};
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0.6mm 2mm 2mm;
             }
 
             .header {
@@ -412,36 +440,38 @@ export class ReceiptService {
           </style>
         </head>
         <body>
-          <div class="header">
-            <h1>Total Journalier</h1>
-            <div class="meta">
-              <div>Succursale ${this.escapeHtml(request.report.branchName)}</div>
-              <div>${request.report.range === 'DAY_START' ? 'Depuis debut de journee' : 'Depuis dernier total imprime'}</div>
-              <div>Periode ${this.escapeHtml(this.formatDateTime(request.report.fromAt))} -> ${this.escapeHtml(this.formatDateTime(request.report.toAt))}</div>
-              <div>Imprime ${this.escapeHtml(this.formatDateTime(request.report.generatedAt))}</div>
+          <div class="ticket-root">
+            <div class="header">
+              <h1>Total Journalier</h1>
+              <div class="meta">
+                <div>Succursale ${this.escapeHtml(request.report.branchName)}</div>
+                <div>${request.report.range === 'DAY_START' ? 'Depuis debut de journee' : 'Depuis dernier total imprime'}</div>
+                <div>Periode ${this.escapeHtml(this.formatDateTime(request.report.fromAt))} -> ${this.escapeHtml(this.formatDateTime(request.report.toAt))}</div>
+                <div>Imprime ${this.escapeHtml(this.formatDateTime(request.report.generatedAt))}</div>
+              </div>
             </div>
-          </div>
-          <div class="divider"></div>
-          <table>
-            <thead>
-              <tr>
-                <th class="time">Heure</th>
-                <th class="item">Commande</th>
-                <th class="price">Montant</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${lineRows}
-            </tbody>
-          </table>
-          <div class="divider"></div>
-          <div class="summary-row">
-            <span>Total commandes</span>
-            <strong>${request.report.orderCount}</strong>
-          </div>
-          <div class="summary-row">
-            <span>Total cumule</span>
-            <strong>${this.formatMoney(request.report.grandTotal, request.report.currency)}</strong>
+            <div class="divider"></div>
+            <table>
+              <thead>
+                <tr>
+                  <th class="time">Heure</th>
+                  <th class="item">Commande</th>
+                  <th class="price">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${lineRows}
+              </tbody>
+            </table>
+            <div class="divider"></div>
+            <div class="summary-row">
+              <span>Total commandes</span>
+              <strong>${request.report.orderCount}</strong>
+            </div>
+            <div class="summary-row">
+              <span>Total cumule</span>
+              <strong>${this.formatMoney(request.report.grandTotal, request.report.currency)}</strong>
+            </div>
           </div>
           <script>
             window.addEventListener('load', () => {

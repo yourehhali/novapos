@@ -68,6 +68,10 @@ interface PrintSalesSummaryRequest {
   report: SalesSummaryReport;
 }
 
+type PrintOptionsWithCssPageSize = Electron.WebContentsPrintOptions & {
+  preferCSSPageSize?: boolean;
+};
+
 let mainWindow: BrowserWindow | null = null;
 
 function createMainWindow(): BrowserWindow {
@@ -156,6 +160,7 @@ async function printTicket(request: PrintTicketRequest): Promise<{
 
   const html = buildTicketHtml(request);
   await printWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+  await waitForPrintLayout(printWindow);
 
   const deviceName =
     request.printer?.systemPrinterName || request.printer?.name || request.printer?.queueName || undefined;
@@ -163,31 +168,37 @@ async function printTicket(request: PrintTicketRequest): Promise<{
 
   try {
     const result = await new Promise<{ success: boolean; failureReason?: string }>((resolve) => {
-      printWindow.webContents.print(
-        {
-          silent: request.printer?.silent ?? true,
-          printBackground: true,
-          deviceName,
-          margins: {
-            marginType: 'none',
-          },
-          pageSize,
+      const printOptions: PrintOptionsWithCssPageSize = {
+        silent: request.printer?.silent ?? true,
+        printBackground: true,
+        deviceName,
+        preferCSSPageSize: true,
+        margins: {
+          marginType: 'none',
         },
+        pageSize,
+      };
+
+      printWindow.webContents.print(
+        printOptions,
           (success: boolean, failureReason: string) => resolve({ success, failureReason }),
       );
     });
 
     if (!result.success && deviceName) {
       const fallbackResult = await new Promise<{ success: boolean; failureReason?: string }>((resolve) => {
-        printWindow.webContents.print(
-          {
-            silent: request.printer?.silent ?? true,
-            printBackground: true,
-            margins: {
-              marginType: 'none',
-            },
-            pageSize,
+        const fallbackPrintOptions: PrintOptionsWithCssPageSize = {
+          silent: request.printer?.silent ?? true,
+          printBackground: true,
+          preferCSSPageSize: true,
+          margins: {
+            marginType: 'none',
           },
+          pageSize,
+        };
+
+        printWindow.webContents.print(
+          fallbackPrintOptions,
           (success: boolean, failureReason: string) => resolve({ success, failureReason }),
         );
       });
@@ -228,6 +239,7 @@ async function printSalesSummary(request: PrintSalesSummaryRequest): Promise<{
 
   const html = buildSalesSummaryHtml(request);
   await printWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
+  await waitForPrintLayout(printWindow);
 
   const deviceName =
     request.printer?.systemPrinterName || request.printer?.name || request.printer?.queueName || undefined;
@@ -238,31 +250,37 @@ async function printSalesSummary(request: PrintSalesSummaryRequest): Promise<{
 
   try {
     const result = await new Promise<{ success: boolean; failureReason?: string }>((resolve) => {
-      printWindow.webContents.print(
-        {
-          silent: request.printer?.silent ?? true,
-          printBackground: true,
-          deviceName,
-          margins: {
-            marginType: 'none',
-          },
-          pageSize,
+      const printOptions: PrintOptionsWithCssPageSize = {
+        silent: request.printer?.silent ?? true,
+        printBackground: true,
+        deviceName,
+        preferCSSPageSize: true,
+        margins: {
+          marginType: 'none',
         },
+        pageSize,
+      };
+
+      printWindow.webContents.print(
+        printOptions,
         (success: boolean, failureReason: string) => resolve({ success, failureReason }),
       );
     });
 
     if (!result.success && deviceName) {
       const fallbackResult = await new Promise<{ success: boolean; failureReason?: string }>((resolve) => {
-        printWindow.webContents.print(
-          {
-            silent: request.printer?.silent ?? true,
-            printBackground: true,
-            margins: {
-              marginType: 'none',
-            },
-            pageSize,
+        const fallbackPrintOptions: PrintOptionsWithCssPageSize = {
+          silent: request.printer?.silent ?? true,
+          printBackground: true,
+          preferCSSPageSize: true,
+          margins: {
+            marginType: 'none',
           },
+          pageSize,
+        };
+
+        printWindow.webContents.print(
+          fallbackPrintOptions,
           (success: boolean, failureReason: string) => resolve({ success, failureReason }),
         );
       });
@@ -286,6 +304,18 @@ async function printSalesSummary(request: PrintSalesSummaryRequest): Promise<{
   } finally {
     printWindow.close();
   }
+}
+
+async function waitForPrintLayout(printWindow: BrowserWindow): Promise<void> {
+  await printWindow.webContents.executeJavaScript(`
+    new Promise(resolve => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(resolve);
+      });
+    });
+  `);
+
+  await new Promise((resolve) => setTimeout(resolve, 100));
 }
 
 function buildPageSizeMicrons(request: PrintTicketRequest): { width: number; height: number } {
@@ -396,18 +426,31 @@ function buildTicketHtml(request: PrintTicketRequest): string {
           }
 
           html, body {
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff;
             color: #111111;
             font-family: "SF Mono", "Menlo", "Consolas", monospace;
             width: ${widthCss};
+            min-height: 0;
+            height: auto;
           }
 
           body {
-            padding: 1.5mm 2mm 2mm;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 0;
             font-size: ${request.kind === 'KITCHEN' ? '11px' : '10px'};
             line-height: 1.2;
+            overflow: hidden;
+          }
+
+          .ticket-root {
+            width: ${widthCss};
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0.6mm 2mm 2mm;
           }
 
           .header {
@@ -483,27 +526,29 @@ function buildTicketHtml(request: PrintTicketRequest): string {
         </style>
       </head>
       <body class="${bodyClass}">
-        <div class="header">
-          <h1>${request.kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</h1>
-          <div class="meta">
-            <div>${escapeHtml(request.order.orderNumber)}</div>
-            <div>${request.kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${escapeHtml(printedAt)}</div>
+        <div class="ticket-root">
+          <div class="header">
+            <h1>${request.kind === 'KITCHEN' ? 'Ticket Cuisine' : 'Ticket Paiement'}</h1>
+            <div class="meta">
+              <div>${escapeHtml(request.order.orderNumber)}</div>
+              <div>${request.kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${escapeHtml(printedAt)}</div>
+            </div>
           </div>
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th class="qty">Qte</th>
+                <th class="item">Article</th>
+                ${totalHeader}
+              </tr>
+            </thead>
+            <tbody>
+              ${lineRows}
+            </tbody>
+          </table>
+          ${totalBlock}
         </div>
-        <div class="divider"></div>
-        <table>
-          <thead>
-            <tr>
-              <th class="qty">Qte</th>
-              <th class="item">Article</th>
-              ${totalHeader}
-            </tr>
-          </thead>
-          <tbody>
-            ${lineRows}
-          </tbody>
-        </table>
-        ${totalBlock}
       </body>
     </html>
   `;
@@ -543,18 +588,31 @@ function buildSalesSummaryHtml(request: PrintSalesSummaryRequest): string {
           }
 
           html, body {
-            margin: 0;
-            padding: 0;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff;
             color: #111111;
             font-family: "SF Mono", "Menlo", "Consolas", monospace;
             width: ${widthCss};
+            min-height: 0;
+            height: auto;
           }
 
           body {
-            padding: 3mm;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 0;
             font-size: 10px;
             line-height: 1.2;
+            overflow: hidden;
+          }
+
+          .ticket-root {
+            width: ${widthCss};
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0.6mm 2mm 2mm;
           }
 
           .header {
@@ -634,39 +692,38 @@ function buildSalesSummaryHtml(request: PrintSalesSummaryRequest): string {
         </style>
       </head>
       <body>
-        <div class="header">
-          <h1>Total Journalier</h1>
-          <div class="meta">
-            <div>Succursale ${escapeHtml(request.report.branchName)}</div>
-            <div>${request.report.range === 'DAY_START' ? 'Depuis debut de journee' : 'Depuis dernier total imprime'}</div>
-            <div>Periode ${escapeHtml(formatDateTime(request.report.fromAt))} -> ${escapeHtml(formatDateTime(request.report.toAt))}</div>
-            <div>Imprime ${escapeHtml(formatDateTime(request.report.generatedAt))}</div>
+        <div class="ticket-root">
+          <div class="header">
+            <h1>Total Journalier</h1>
+            <div class="meta">
+              <div>Succursale ${escapeHtml(request.report.branchName)}</div>
+              <div>${request.report.range === 'DAY_START' ? 'Depuis debut de journee' : 'Depuis dernier total imprime'}</div>
+              <div>Periode ${escapeHtml(formatDateTime(request.report.fromAt))} -> ${escapeHtml(formatDateTime(request.report.toAt))}</div>
+              <div>Imprime ${escapeHtml(formatDateTime(request.report.generatedAt))}</div>
+            </div>
           </div>
-        </div>
-        <div class="divider"></div>
-        <table>
-          <thead>
-            <tr>
-              <th class="time">Heure</th>
-              <th class="item">Commande</th>
-              <th class="price">Montant</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${lineRows}
-          </tbody>
-        </table>
-        <div class="divider"></div>
-        <div class="summary-row">
-          <span>Total commandes</span>
-          <strong>${request.report.orderCount}</strong>
-        </div>
-        <div class="summary-row">
-          <span>Total cumule</span>
-          <strong>${formatMoney(request.report.grandTotal, request.report.currency)}</strong>
-        </div>
-        <div class="footer">
-          Impression locale depuis le poste de caisse.
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <th class="time">Heure</th>
+                <th class="item">Commande</th>
+                <th class="price">Montant</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lineRows}
+            </tbody>
+          </table>
+          <div class="divider"></div>
+          <div class="summary-row">
+            <span>Total commandes</span>
+            <strong>${request.report.orderCount}</strong>
+          </div>
+          <div class="summary-row">
+            <span>Total cumule</span>
+            <strong>${formatMoney(request.report.grandTotal, request.report.currency)}</strong>
+          </div>
         </div>
       </body>
     </html>
