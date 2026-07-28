@@ -124,6 +124,10 @@ function createMainWindow(): BrowserWindow {
   }
 
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (url === 'about:blank') {
+      return { action: 'allow' };
+    }
+
     shell.openExternal(url).catch(() => undefined);
     return { action: 'deny' };
   });

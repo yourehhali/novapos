@@ -67,6 +67,8 @@ import { SyncService } from '../core/services/sync.service';
           <router-outlet></router-outlet>
         </section>
       </main>
+
+      <app-modal></app-modal>
     </div>
   `,
   styles: [

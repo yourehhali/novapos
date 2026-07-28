@@ -234,24 +234,24 @@ public class SampleDataService {
             "Front Counter Receipt",
             "RECEIPT",
             "ESC_POS",
-            "COUNTER-01",
+            "EPSON TM-T20II Receipt",
             80,
             42,
             "THERMAL",
             true,
-            "COUNTER-01"
+            "EPSON TM-T20II Receipt"
         ),
         new PrinterRecord(
             "kitchen-hot",
             "Kitchen Hot Line",
             "KITCHEN",
             "ESC_POS",
-            "KITCHEN-HOT-01",
+            "EPSON TM-T20II Receipt",
             80,
             42,
             "THERMAL",
             true,
-            "KITCHEN-HOT-01"
+            "EPSON TM-T20II Receipt"
         )
     );
 

@@ -93,8 +93,8 @@ Pass123!
 
 | Name | Target | Protocol | Queue |
 |---|---|---|---|
-| Front Counter Receipt | `RECEIPT` | `ESC_POS` | `COUNTER-01` |
-| Kitchen Hot Line | `KITCHEN` | `ESC_POS` | `KITCHEN-HOT-01` |
+| Front Counter Receipt | `RECEIPT` | `ESC_POS` | `EPSON TM-T20II Receipt` |
+| Kitchen Hot Line | `KITCHEN` | `ESC_POS` | `EPSON TM-T20II Receipt` |
 
 Desktop printing metadata also flows with each printer config:
 

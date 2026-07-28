@@ -5,14 +5,18 @@ import {
   PrinterConfig,
   SalesSummaryReport,
   PrintTicketRequest,
+  PrintTicketResult,
 } from '../models/app.models';
+import { AppModalService } from './app-modal.service';
 import { DesktopBridgeService } from './desktop-bridge.service';
 import { WorkspaceService } from './workspace.service';
 
 type TicketKind = PrintTicketRequest['kind'];
+const HARDCODED_PRINTER_NAME = 'EPSON TM-T20II Receipt';
 
 @Injectable({ providedIn: 'root' })
 export class ReceiptService {
+  private readonly appModal = inject(AppModalService);
   private readonly desktopBridge = inject(DesktopBridgeService);
   private readonly workspaceService = inject(WorkspaceService);
 
@@ -34,6 +38,7 @@ export class ReceiptService {
 
   async printSalesSummary(report: SalesSummaryReport): Promise<boolean> {
     const printer = await this.resolvePrinter('PAYMENT');
+    let desktopFailure: string | null = null;
 
     if (this.desktopBridge.isDesktop()) {
       try {
@@ -42,19 +47,30 @@ export class ReceiptService {
           return true;
         }
 
-        console.error('[ReceiptService] Desktop sales summary printing failed.', result?.message ?? 'Unknown error.');
+        desktopFailure = this.describePrintFailure(result, 'Desktop sales summary printing failed.');
+        console.error('[ReceiptService] Desktop sales summary printing failed.', desktopFailure);
       } catch (error) {
+        desktopFailure = this.describeUnknownError(error, 'Desktop sales summary printing failed.');
         console.error('[ReceiptService] Desktop sales summary printing threw an error.', error);
       }
-
-      return this.printSalesSummaryWithBrowser({ printer, report });
     }
 
-    return this.printSalesSummaryWithBrowser({ printer, report });
+    const browserResult = this.printSalesSummaryWithBrowser({ printer, report });
+    if (browserResult.success) {
+      return true;
+    }
+
+    this.showPrintError(
+      'Impression du total impossible',
+      'Le total journalier n a pas pu etre imprime.',
+      desktopFailure ?? browserResult.message,
+    );
+    return false;
   }
 
   private async printTicket(kind: TicketKind, order: CompletedOrder): Promise<boolean> {
     const printer = await this.resolvePrinter(kind);
+    let desktopFailure: string | null = null;
 
     if (this.desktopBridge.isDesktop()) {
       try {
@@ -63,15 +79,26 @@ export class ReceiptService {
           return true;
         }
 
-        console.error('[ReceiptService] Desktop printing failed.', result?.message ?? 'Unknown error.');
+        desktopFailure = this.describePrintFailure(result, 'Desktop printing failed.');
+        console.error('[ReceiptService] Desktop printing failed.', desktopFailure);
       } catch (error) {
+        desktopFailure = this.describeUnknownError(error, 'Desktop printing failed.');
         console.error('[ReceiptService] Desktop printing threw an error.', error);
       }
-
-      return this.printWithBrowser(kind, order, printer);
     }
 
-    return this.printWithBrowser(kind, order, printer);
+    const browserResult = this.printWithBrowser(kind, order, printer);
+    if (browserResult.success) {
+      return true;
+    }
+
+    const ticketLabel = kind === 'KITCHEN' ? 'le ticket cuisine' : 'le ticket de paiement';
+    this.showPrintError(
+      'Impression impossible',
+      `Nous n avons pas pu imprimer ${ticketLabel}.`,
+      desktopFailure ?? browserResult.message,
+    );
+    return false;
   }
 
   private async resolvePrinter(kind: TicketKind): Promise<PrinterConfig | undefined> {
@@ -79,45 +106,95 @@ export class ReceiptService {
 
     try {
       const printers = await this.workspaceService.loadPrinters();
-      return printers.find((printer) => printer.target === target);
+      const printer = printers.find((printer) => printer.target === target);
+      if (!printer) {
+        return {
+          id: target === 'KITCHEN' ? 'kitchen-hardcoded' : 'receipt-hardcoded',
+          name: HARDCODED_PRINTER_NAME,
+          target,
+          protocol: 'ESC_POS',
+          queueName: HARDCODED_PRINTER_NAME,
+          paperWidthMm: 80,
+          charactersPerLine: 42,
+          printMode: 'THERMAL',
+          silent: true,
+          systemPrinterName: HARDCODED_PRINTER_NAME,
+        };
+      }
+
+      return {
+        ...printer,
+        name: HARDCODED_PRINTER_NAME,
+        queueName: HARDCODED_PRINTER_NAME,
+        systemPrinterName: HARDCODED_PRINTER_NAME,
+      };
     } catch (error) {
       console.error('[ReceiptService] Unable to load printer configuration.', error);
-      return undefined;
+      return {
+        id: target === 'KITCHEN' ? 'kitchen-hardcoded' : 'receipt-hardcoded',
+        name: HARDCODED_PRINTER_NAME,
+        target,
+        protocol: 'ESC_POS',
+        queueName: HARDCODED_PRINTER_NAME,
+        paperWidthMm: 80,
+        charactersPerLine: 42,
+        printMode: 'THERMAL',
+        silent: true,
+        systemPrinterName: HARDCODED_PRINTER_NAME,
+      };
     }
   }
 
-  private printWithBrowser(kind: TicketKind, order: CompletedOrder, printer?: PrinterConfig): boolean {
+  private printWithBrowser(
+    kind: TicketKind,
+    order: CompletedOrder,
+    printer?: PrinterConfig,
+  ): { success: boolean; message?: string } {
     if (typeof window === 'undefined') {
-      return false;
+      return {
+        success: false,
+        message: 'La fenetre du navigateur nest pas disponible pour imprimer.',
+      };
     }
 
     const printWindow = window.open('', '_blank', 'popup,width=480,height=760');
     if (!printWindow) {
       console.error('[ReceiptService] Browser popup was blocked.');
-      return false;
+      return {
+        success: false,
+        message: 'La fenetre d impression a ete bloquee par le navigateur ou le systeme.',
+      };
     }
 
     printWindow.document.open();
     printWindow.document.write(this.buildBrowserTicketHtml(kind, order, printer));
     printWindow.document.close();
-    return true;
+    return { success: true };
   }
 
-  private printSalesSummaryWithBrowser(request: PrintSalesSummaryRequest): boolean {
+  private printSalesSummaryWithBrowser(
+    request: PrintSalesSummaryRequest,
+  ): { success: boolean; message?: string } {
     if (typeof window === 'undefined') {
-      return false;
+      return {
+        success: false,
+        message: 'La fenetre du navigateur nest pas disponible pour imprimer.',
+      };
     }
 
     const printWindow = window.open('', '_blank', 'popup,width=480,height=900');
     if (!printWindow) {
       console.error('[ReceiptService] Browser popup was blocked.');
-      return false;
+      return {
+        success: false,
+        message: 'La fenetre d impression a ete bloquee par le navigateur ou le systeme.',
+      };
     }
 
     printWindow.document.open();
     printWindow.document.write(this.buildBrowserSalesSummaryHtml(request));
     printWindow.document.close();
-    return true;
+    return { success: true };
   }
 
   private buildBrowserTicketHtml(
@@ -524,6 +601,24 @@ export class ReceiptService {
       : 24 + totalLines * 4.2;
 
     return Math.max(80, Math.min(320, Math.ceil(heightMm)));
+  }
+
+  private describePrintFailure(result: PrintTicketResult | null, fallbackMessage: string): string {
+    if (!result) {
+      return fallbackMessage;
+    }
+
+    return result.printerName
+      ? `${result.message} Imprimante cible: ${result.printerName}.`
+      : result.message;
+  }
+
+  private describeUnknownError(error: unknown, fallbackMessage: string): string {
+    return error instanceof Error && error.message ? error.message : fallbackMessage;
+  }
+
+  private showPrintError(title: string, message: string, details?: string): void {
+    this.appModal.openError(title, message, details);
   }
 
   private formatDateTime(value: string): string {

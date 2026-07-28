@@ -16,6 +16,7 @@ import { LoginPageComponent } from './pages/login/login-page.component';
 import { OrderHistoryPageComponent } from './pages/order-history/order-history-page.component';
 import { PosPageComponent } from './pages/pos/pos-page.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
+import { AppModalComponent } from './shared/components/app-modal/app-modal.component';
 
 @NgModule({
   declarations: [
@@ -27,6 +28,7 @@ import { SettingsPageComponent } from './pages/settings/settings-page.component'
     PosPageComponent,
     OrderHistoryPageComponent,
     SettingsPageComponent,
+    AppModalComponent,
     AdminBusinessPageComponent,
     AdminBranchesPageComponent,
     AdminUsersPageComponent,
