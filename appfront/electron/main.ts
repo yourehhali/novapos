@@ -172,17 +172,20 @@ async function printTicket(request: PrintTicketRequest): Promise<{
   message: string;
   printerName?: string;
 }> {
-  const printWindow = new BrowserWindow({ show: false, width: mapWidthToWindowPx(request.printer?.paperWidthMm ?? 80), height: 900, backgroundColor: '#ffffff', webPreferences: { sandbox: true } });
-  const html = buildTicketHtml(request);
-  await printWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
-  await waitForPrintLayout(printWindow);
-  const deviceName = request.printer?.systemPrinterName || request.printer?.name || request.printer?.queueName || undefined;
-  const pageSize = buildPageSizeMicrons(request);
   try {
-    const result = await new Promise<{ success: boolean; failureReason?: string }>((resolve) => printWindow.webContents.print({ silent: request.printer?.silent ?? true, printBackground: true, deviceName, preferCSSPageSize: true, margins: { marginType: 'none' }, pageSize } as PrintOptionsWithCssPageSize, (success: boolean, failureReason: string) => resolve({ success, failureReason })));
-    return { success: result.success, message: result.success ? 'Printed successfully.' : result.failureReason || 'Desktop printing failed.', printerName: deviceName };
-  } finally {
-    printWindow.close();
+    const payload = buildTicketEscPosPayload(request);
+    const result = await dispatchEscPosPayload(request.printer, payload);
+    return {
+      success: true,
+      message: 'Ticket imprime via ESC/POS.',
+      printerName: result.printerName,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: getErrorMessage(error, 'ESC/POS printing failed.'),
+      printerName: resolveConfiguredPrinterName(request.printer),
+    };
   }
 }
 
@@ -191,17 +194,20 @@ async function printSalesSummary(request: PrintSalesSummaryRequest): Promise<{
   message: string;
   printerName?: string;
 }> {
-  const printWindow = new BrowserWindow({ show: false, width: mapWidthToWindowPx(request.printer?.paperWidthMm ?? 80), height: 1100, backgroundColor: '#ffffff', webPreferences: { sandbox: true } });
-  const html = buildSalesSummaryHtml(request);
-  await printWindow.loadURL(`data:text/html;charset=UTF-8,${encodeURIComponent(html)}`);
-  await waitForPrintLayout(printWindow);
-  const deviceName = request.printer?.systemPrinterName || request.printer?.name || request.printer?.queueName || undefined;
-  const pageSize = { width: (request.printer?.paperWidthMm ?? 80) * 1000, height: estimateSalesSummaryHeightMm(request) * 1000 };
   try {
-    const result = await new Promise<{ success: boolean; failureReason?: string }>((resolve) => printWindow.webContents.print({ silent: request.printer?.silent ?? true, printBackground: true, deviceName, preferCSSPageSize: true, margins: { marginType: 'none' }, pageSize } as PrintOptionsWithCssPageSize, (success: boolean, failureReason: string) => resolve({ success, failureReason })));
-    return { success: result.success, message: result.success ? 'Printed successfully.' : result.failureReason || 'Desktop summary printing failed.', printerName: deviceName };
-  } finally {
-    printWindow.close();
+    const payload = buildSalesSummaryEscPosPayload(request);
+    const result = await dispatchEscPosPayload(request.printer, payload);
+    return {
+      success: true,
+      message: 'Total imprime via ESC/POS.',
+      printerName: result.printerName,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: getErrorMessage(error, 'ESC/POS summary printing failed.'),
+      printerName: resolveConfiguredPrinterName(request.printer),
+    };
   }
 }
 
