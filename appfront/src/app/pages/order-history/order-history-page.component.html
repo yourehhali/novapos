@@ -1,0 +1,120 @@
+<section class="history-page">
+  <header class="page-header">
+    <div class="page-title">
+      <p class="eyebrow">Historique des commandes</p>
+      <h1>Commandes preparees et payees</h1>
+      <span class="summary-note">{{ summaryPrintedLabel() }}</span>
+    </div>
+    <div class="page-actions">
+      <p class="page-note">Les commandes restent disponibles localement sur cet appareil, meme hors ligne.</p>
+      <div class="summary-actions">
+        <button
+          type="button"
+          class="secondary-button"
+          [disabled]="printingSummary()"
+          (click)="printSalesSummary('DAY_START')"
+        >
+          {{ printingSummary() ? 'Impression...' : 'Total depuis debut journee' }}
+        </button>
+        <button
+          type="button"
+          class="primary-button"
+          [disabled]="printingSummary()"
+          (click)="printSalesSummary('LAST_REPORT')"
+        >
+          {{ printingSummary() ? 'Impression...' : 'Total depuis dernier imprime' }}
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="orders-grid" *ngIf="orders().length; else emptyState">
+    <article class="order-card" *ngFor="let order of orders()">
+      <div class="card-top">
+        <div class="order-index">{{ orderIndex(order.orderNumber) }}</div>
+        <div class="order-head">
+          <strong>{{ order.cashierName }}</strong>
+          <span>{{ order.orderNumber }}</span>
+        </div>
+        <span class="order-badge" [class.paid]="order.status === 'PAID'">
+          {{ statusLabel(order.status) }}
+        </span>
+      </div>
+
+      <div class="order-meta">
+        <span>{{ order.createdAt | date: 'EEEE d MMMM y' }}</span>
+        <strong>{{ order.createdAt | date: 'HH:mm' }}</strong>
+      </div>
+
+      <div class="line-table">
+        <div class="line-header">
+          <span>Qte</span>
+          <span>Produits</span>
+          <span>Prix</span>
+        </div>
+
+        <div class="line-row" *ngFor="let line of visibleLines(order)">
+          <span>{{ line.quantity | number: '2.0-0' }}</span>
+          <span>{{ line.name }}</span>
+          <span>{{ line.total | number: '1.2-2' }} DH</span>
+        </div>
+
+        <div class="line-row muted" *ngIf="order.lines.length > 5">
+          <span></span>
+          <span>...</span>
+          <span></span>
+        </div>
+      </div>
+
+      <div class="order-total">
+        <span>Total</span>
+        <strong>{{ order.total | number: '1.2-2' }} DH</strong>
+      </div>
+
+      <div class="payment-row" *ngIf="order.status === 'PREPARED'">
+        <label>
+          Mode de paiement
+          <select [ngModel]="paymentMethodFor(order.id)" (ngModelChange)="setPaymentMethod(order.id, $event)">
+            <option value="CASH">Especes</option>
+            <option value="CARD">Carte</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="card-actions">
+        <button
+          *ngIf="order.status === 'PREPARED'; else paidAction"
+          type="button"
+          class="secondary-button"
+          (click)="modify(order.id)"
+        >
+          Modifier
+        </button>
+
+        <ng-template #paidAction>
+          <button type="button" class="secondary-button" (click)="reprint(order)">Reimprimer</button>
+        </ng-template>
+
+        <button
+          *ngIf="order.status === 'PREPARED'; else paidState"
+          type="button"
+          class="primary-button"
+          (click)="pay(order.id)"
+        >
+          Payer
+        </button>
+
+        <ng-template #paidState>
+          <button type="button" class="primary-button paid-button" disabled>Paye</button>
+        </ng-template>
+      </div>
+    </article>
+  </div>
+
+  <ng-template #emptyState>
+    <article class="empty-card">
+      <p>Aucune commande dans l historique.</p>
+      <span>Preparez une commande dans le POS et elle apparaitra ici pour le paiement.</span>
+    </article>
+  </ng-template>
+</section>

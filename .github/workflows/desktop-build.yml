@@ -1,0 +1,74 @@
+name: Build Desktop Apps
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'appfront/**'
+      - '.github/workflows/desktop-build.yml'
+
+jobs:
+  build-windows:
+    name: Build Windows EXE
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: appfront
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: appfront/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Package Windows desktop app
+        run: npm run desktop:package:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: novapos-desktop-windows
+          path: appfront/release/**
+          if-no-files-found: error
+
+  build-macos:
+    name: Build macOS App
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: appfront
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: appfront/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Package macOS desktop app
+        run: npm run desktop:package:mac
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: novapos-desktop-macos
+          path: appfront/release/**
+          if-no-files-found: error

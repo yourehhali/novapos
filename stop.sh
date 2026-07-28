@@ -1,0 +1,1 @@
+kill $(cat ".run/api.pid") $(cat ".run/appfront.pid")

@@ -1,0 +1,140 @@
+<section class="pos-workspace">
+  <article class="cart-panel">
+    <div class="invoice-card">
+      <div class="invoice-header">
+        <div>
+          <p class="eyebrow">Ticket commande</p>
+          <h1>Commande en cours</h1>
+        </div>
+        <span class="status-pill">Preparer d abord, payer ensuite</span>
+      </div>
+
+      <div class="helper-card">
+        Cliquer sur <strong>Preparer</strong> envoie le ticket a l imprimante cuisine et enregistre
+        la commande localement. Le paiement se fait ensuite depuis <strong>Historique</strong>.
+      </div>
+
+      <div class="cart-list" *ngIf="pos.cart().length; else emptyCart">
+        <div class="cart-item" *ngFor="let line of pos.cart()">
+          <div class="cart-meta">
+            <strong>{{ line.name }}</strong>
+            <p>{{ line.unitPrice | number: '1.2-2' }} MAD each</p>
+          </div>
+
+          <div class="cart-actions">
+            <button type="button" class="qty-button" (click)="pos.removeProduct(line.productId)">-</button>
+            <span class="cart-qty">{{ line.quantity }}</span>
+            <button type="button" class="qty-button add" (click)="incrementFromCart(line.productId)">+</button>
+          </div>
+
+          <div class="cart-total">{{ line.total | number: '1.2-2' }} DH</div>
+        </div>
+      </div>
+
+      <ng-template #emptyCart>
+        <div class="empty-state">
+          <p>Aucun article ajoute.</p>
+          <span>Choisissez des articles du catalogue pour commencer cette commande.</span>
+        </div>
+      </ng-template>
+
+      <div class="summary-card">
+        <div>
+          <span>Total</span>
+          <strong>{{ pos.subtotal() | number: '1.2-2' }} DH</strong>
+        </div>
+      </div>
+    </div>
+
+    <div class="cart-footer">
+      <button type="button" class="ghost-button" [disabled]="pos.cart().length === 0" (click)="pos.clearCart()">
+        Vider
+      </button>
+      <button type="button" class="checkout-button" [disabled]="busy() || pos.cart().length === 0" (click)="prepare()">
+        {{ busy() ? 'Preparation...' : 'Preparer' }}
+      </button>
+    </div>
+
+    <div class="receipt-card" *ngIf="pos.lastOrder() as lastOrder">
+      <div class="receipt-head">
+        <div>
+          <p class="eyebrow">Derniere commande</p>
+          <h3>{{ lastOrder.orderNumber }}</h3>
+        </div>
+        <span class="badge" [class.paid]="lastOrder.status === 'PAID'">{{ statusLabel(lastOrder.status) }}</span>
+      </div>
+      <p>{{ lastOrder.total | number: '1.2-2' }} DH · {{ lastOrder.lineCount }} lignes</p>
+      <button type="button" class="secondary-button" (click)="printLastOrder()">
+        {{ lastOrder.status === 'PAID' ? 'Imprimer ticket paiement' : 'Imprimer ticket cuisine' }}
+      </button>
+    </div>
+  </article>
+
+  <article class="catalog-panel">
+    <div class="catalog-toolbar">
+      <div>
+        <p class="eyebrow">Catalogue</p>
+        <h2>Menu comptoir</h2>
+      </div>
+
+      <input
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+        placeholder="Rechercher un article ou SKU"
+      />
+    </div>
+
+    <div class="category-grid">
+      <button type="button" class="category-card" [class.active]="selectedCategory() === 'all'" (click)="selectedCategory.set('all')">
+        <span class="category-icon">A</span>
+        <div class="category-info">
+          <strong>Tous les articles</strong>
+          <p>{{ products().length }} articles</p>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        class="category-card"
+        *ngFor="let category of categories()"
+        [class.active]="selectedCategory() === category.id"
+        (click)="selectedCategory.set(category.id)"
+      >
+        <span class="category-icon">{{ category.name.charAt(0) }}</span>
+        <div class="category-info">
+          <strong>{{ category.name }}</strong>
+            <p>{{ productCountForCategory(category.id) }} articles</p>
+        </div>
+      </button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="product-grid">
+      <article class="product-card" *ngFor="let product of filteredProducts()">
+        <div class="product-info">
+          <strong>{{ product.name }}</strong>
+          <span>{{ categoryName(product.categoryId) }}</span>
+          <p>{{ product.sku }}</p>
+        </div>
+
+        <div class="product-footer">
+          <em>{{ product.price | number: '1.2-2' }} DH</em>
+
+          <div class="product-actions">
+            <button
+              type="button"
+              class="qty-button"
+              [disabled]="quantityFor(product.id) === 0"
+              (click)="pos.removeProduct(product.id)"
+            >
+              -
+            </button>
+            <span>{{ quantityFor(product.id) }}</span>
+            <button type="button" class="qty-button add" (click)="add(product)">+</button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </article>
+</section>

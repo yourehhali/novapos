@@ -1,0 +1,16 @@
+{
+  "name": "NovaPOS",
+  "short_name": "NovaPOS",
+  "theme_color": "#090d10",
+  "background_color": "#090d10",
+  "display": "standalone",
+  "start_url": "/",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ]
+}

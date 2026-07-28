@@ -1,0 +1,11 @@
+.run/
+.DS_Store
+
+# Desktop packaging artifacts
+appfront/release/
+appfront/dist/
+appfront/dist-electron/
+
+# Frontend dependencies and local cache
+appfront/node_modules/
+appfront/.angular/
