@@ -190,14 +190,23 @@ export class BranchSelectPageComponent {
 
     try {
       await this.authService.bindBranch(this.selectedBranchId(), this.deviceType, this.deviceCode || undefined);
+      void this.warmWorkspaceCache();
+      await this.router.navigateByUrl('/dashboard');
+    } finally {
+      this.loading.set(false);
+    }
+  }
+
+  private async warmWorkspaceCache(): Promise<void> {
+    try {
       await Promise.all([
         this.workspaceService.loadCatalog(),
         this.workspaceService.loadDashboard(),
         this.workspaceService.loadPrinters(),
+        this.workspaceService.loadSyncStatus(),
       ]);
-      await this.router.navigateByUrl('/dashboard');
-    } finally {
-      this.loading.set(false);
+    } catch {
+      // Navigation already continues with local data; cache warming is best effort only.
     }
   }
 }

@@ -10,7 +10,7 @@ import {
 } from '../models/app.models';
 
 const DEMO_TENANT_ID = 'tenant-atlas-bites';
-const DEMO_BUSINESS_NAME = 'Atlas Bites Group';
+const DEMO_BUSINESS_NAME = 'Hole Mole';
 const DEMO_PASSWORD = 'Pass123!';
 const OFFLINE_TOKEN_PREFIX = 'offline-demo-token:';
 
@@ -209,6 +209,29 @@ export function getOfflineDemoAuthSession(login: string, password: string): Auth
   };
 }
 
+export function getDefaultOfflineAuthSession(): AuthSessionResponse {
+  const defaultSession = getOfflineDemoAuthSession('cashier@novapos.ma', DEMO_PASSWORD);
+  if (!defaultSession) {
+    throw new Error('Default offline demo session is unavailable.');
+  }
+
+  return {
+    ...defaultSession,
+    user: {
+      ...defaultSession.user,
+      displayName: 'Hole Mole POS',
+      businessName: DEMO_BUSINESS_NAME,
+      branchAssignments: [
+        {
+          branchId: 'branch-oujda',
+          branchName: 'Hole Mole',
+          defaultDeviceType: 'POS_TERMINAL',
+        },
+      ],
+    },
+  };
+}
+
 export function getOfflineBootstrapSession(
   branchId: string,
   deviceType: string,
@@ -223,13 +246,22 @@ export function getOfflineBootstrapSession(
     tenantId: DEMO_TENANT_ID,
     businessName: DEMO_BUSINESS_NAME,
     branchId: branch.branchId,
-    branchName: branch.branchName,
+    branchName: branch.branchId === 'branch-oujda' ? 'Hole Mole' : branch.branchName,
     timezone: branch.timezone,
     deviceCode: deviceCode || `${branch.branchId.toUpperCase()}-${deviceType.toUpperCase()}`,
     deviceType,
     lastSyncAt: new Date().toISOString(),
     enabledFeatures: ['POS', 'ORDERS', 'SYNC', 'PRINTING'],
   };
+}
+
+export function getDefaultOfflineBootstrapSession(): BootstrapSession {
+  const branch = getOfflineBootstrapSession('branch-oujda', 'POS_TERMINAL', 'HOLEMOLE-POS-1');
+  if (!branch) {
+    throw new Error('Default offline demo branch is unavailable.');
+  }
+
+  return branch;
 }
 
 export function getOfflineDemoCatalog(): { products: Product[]; categories: Category[] } {

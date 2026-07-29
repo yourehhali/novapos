@@ -1,13 +1,19 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import { ApiService } from './api.service';
 import { SessionService } from './session.service';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { AuthSessionResponse, BootstrapSession } from '../models/app.models';
-import { getOfflineBootstrapSession, getOfflineDemoAuthSession } from '../demo/offline-demo.data';
+import {
+  getDefaultOfflineAuthSession,
+  getDefaultOfflineBootstrapSession,
+  getOfflineBootstrapSession,
+  getOfflineDemoAuthSession,
+} from '../demo/offline-demo.data';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
+  private static readonly AUTH_TIMEOUT_MS = 1200;
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
   private readonly db = inject(NovaPosDbService);
@@ -16,7 +22,9 @@ export class AuthService {
     let response: AuthSessionResponse;
 
     try {
-      response = await firstValueFrom(this.api.login(login, password));
+      response = await firstValueFrom(
+        this.api.login(login, password).pipe(timeout(AuthService.AUTH_TIMEOUT_MS)),
+      );
     } catch {
       const offlineResponse = getOfflineDemoAuthSession(login, password);
       if (!offlineResponse) {
@@ -39,21 +47,35 @@ export class AuthService {
 
   async restoreSession(): Promise<boolean> {
     const cached = await this.db.sessionContext.get('current');
+    const defaultSession = getDefaultOfflineAuthSession();
+
     if (!cached) {
-      return false;
+      await this.seedDefaultOfflineSession();
+      return true;
     }
 
     this.session.setAuth(
-      cached.accessToken,
-      cached.refreshToken,
-      JSON.parse(cached.user),
+      defaultSession.accessToken,
+      defaultSession.refreshToken,
+      defaultSession.user,
     );
+
+    await this.db.sessionContext.put({
+      ...cached,
+      accessToken: defaultSession.accessToken,
+      refreshToken: defaultSession.refreshToken,
+      user: JSON.stringify(defaultSession.user),
+    });
 
     if (cached.branchId) {
       const branch = await this.db.bootstrapSessions.get(cached.branchId);
       if (branch) {
         this.session.setBranch(branch);
+      } else {
+        await this.ensureDefaultBranchBinding();
       }
+    } else {
+      await this.ensureDefaultBranchBinding();
     }
 
     return true;
@@ -68,7 +90,9 @@ export class AuthService {
     let branch: BootstrapSession;
     try {
       branch = await firstValueFrom(
-        this.api.bootstrapSession(token, branchId, deviceType, deviceCode),
+        this.api
+          .bootstrapSession(token, branchId, deviceType, deviceCode)
+          .pipe(timeout(AuthService.AUTH_TIMEOUT_MS)),
       );
     } catch {
       const offlineBranch = getOfflineBootstrapSession(branchId, deviceType, deviceCode);
@@ -92,5 +116,37 @@ export class AuthService {
   async logout(): Promise<void> {
     this.session.clear();
     await this.db.sessionContext.clear();
+  }
+
+  private async seedDefaultOfflineSession(): Promise<void> {
+    const response = getDefaultOfflineAuthSession();
+    const branch = getDefaultOfflineBootstrapSession();
+
+    this.session.setAuth(response.accessToken, response.refreshToken, response.user);
+    this.session.setBranch(branch);
+
+    await this.db.bootstrapSessions.put(branch);
+    await this.db.sessionContext.put({
+      id: 'current',
+      accessToken: response.accessToken,
+      refreshToken: response.refreshToken,
+      user: JSON.stringify(response.user),
+      branchId: branch.branchId,
+      branchName: branch.branchName,
+      deviceCode: branch.deviceCode,
+      deviceType: branch.deviceType,
+    });
+  }
+
+  private async ensureDefaultBranchBinding(): Promise<void> {
+    const branch = getDefaultOfflineBootstrapSession();
+    this.session.setBranch(branch);
+    await this.db.bootstrapSessions.put(branch);
+    await this.db.sessionContext.update('current', {
+      branchId: branch.branchId,
+      branchName: branch.branchName,
+      deviceCode: branch.deviceCode,
+      deviceType: branch.deviceType,
+    });
   }
 }

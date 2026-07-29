@@ -193,7 +193,7 @@ export class SettingsPageComponent implements OnInit {
   }
 
   protected async runManualSync(): Promise<void> {
-    await this.syncService.runSync();
+    this.syncService.scheduleSync(0);
     this.syncStatus.set(await this.workspaceService.loadSyncStatus());
   }
 

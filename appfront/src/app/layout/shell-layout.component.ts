@@ -14,10 +14,10 @@ import { SyncService } from '../core/services/sync.service';
         </button>
 
         <div class="brand">
-          <span class="brand-mark">NP</span>
+          <span class="brand-mark">HM</span>
           <div *ngIf="!sidebarCollapsed()">
-            <h1>NovaPOS</h1>
-            <p>Offline-first operations</p>
+            <h1>Hole Mole</h1>
+            <p>POS local</p>
           </div>
         </div>
 
@@ -31,26 +31,14 @@ import { SyncService } from '../core/services/sync.service';
           <a routerLink="/orders" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Historique' : null">
             {{ sidebarCollapsed() ? 'His' : 'Historique' }}
           </a>
-          <a routerLink="/settings" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Parametres' : null">
-            {{ sidebarCollapsed() ? 'Cfg' : 'Parametres' }}
-          </a>
-          <a routerLink="/admin/business" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Entreprise' : null">
-            {{ sidebarCollapsed() ? 'Ent' : 'Entreprise' }}
-          </a>
-          <a routerLink="/admin/branches" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Succursales' : null">
-            {{ sidebarCollapsed() ? 'Suc' : 'Succursales' }}
-          </a>
-          <a routerLink="/admin/users" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Utilisateurs' : null">
-            {{ sidebarCollapsed() ? 'Usr' : 'Utilisateurs' }}
-          </a>
         </nav>
       </aside>
 
       <main class="workspace">
         <header class="topbar">
           <div class="topbar-title">
-            <p class="eyebrow">Succursale active</p>
-            <h2>{{ session.currentBranchName() }}</h2>
+            <p class="eyebrow">Entreprise active</p>
+            <h2>{{ businessName() }}</h2>
           </div>
 
           <div class="status-cluster">
@@ -59,7 +47,6 @@ import { SyncService } from '../core/services/sync.service';
             </span>
             <span class="pill neutral">Appareil {{ session.branch()?.deviceCode || 'En attente' }}</span>
             <span class="pill neutral">{{ sync.syncMessage() }}</span>
-            <span class="pill neutral">{{ welcomeLine() }}</span>
           </div>
         </header>
 
@@ -282,7 +269,7 @@ export class ShellLayoutComponent {
   protected readonly network = inject(NetworkService);
   protected readonly sync = inject(SyncService);
   protected readonly sidebarCollapsed = signal(this.readSidebarPreference());
-  protected readonly welcomeLine = computed(() => `${this.session.displayName()} pret`);
+  protected readonly businessName = computed(() => this.session.user()?.businessName ?? 'Hole Mole');
 
   protected toggleSidebar(): void {
     const next = !this.sidebarCollapsed();

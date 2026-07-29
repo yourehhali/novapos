@@ -61,7 +61,7 @@ export class PosPageComponent implements OnInit {
       const order = await this.pos.prepareOrder();
       if (order) {
         await this.receiptService.printKitchenTicket(order);
-        await this.syncService.runSync();
+        this.syncService.scheduleSync(100);
       }
     } finally {
       this.busy.set(false);

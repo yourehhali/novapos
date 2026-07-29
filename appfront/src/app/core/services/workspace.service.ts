@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 import {
   CompletedOrder,
   Category,
@@ -21,65 +21,61 @@ import {
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
+  private static readonly API_TIMEOUT_MS = 1200;
   private readonly db = inject(NovaPosDbService);
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
+  private catalogCache: { products: Product[]; categories: Category[] } | null = null;
+  private printersCache: PrinterConfig[] | null = null;
+  private readonly dashboardCache = new Map<string, DashboardSummary>();
+  private readonly syncStatusCache = new Map<string, SyncStatus>();
 
   async loadCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
     const token = this.session.accessToken();
+    const cachedCatalog = await this.loadCachedOrDemoCatalog();
+    if (cachedCatalog.products.length > 0 && cachedCatalog.categories.length > 0) {
+      if (token && !isOfflineDemoToken(token)) {
+        void this.refreshCatalogFromApi(token);
+      }
+      return cachedCatalog;
+    }
+
     if (!token || isOfflineDemoToken(token)) {
-      return this.loadCachedOrDemoCatalog();
+      return cachedCatalog;
     }
 
-    try {
-      const [products, categories] = await Promise.all([
-        firstValueFrom(this.api.getProducts(token)),
-        firstValueFrom(this.api.getCategories(token)),
-      ]);
-
-      await this.db.products.bulkPut(products);
-      await this.db.categories.bulkPut(categories);
-
-      return { products, categories };
-    } catch {
-      return this.loadCachedOrDemoCatalog();
-    }
+    return this.refreshCatalogFromApi(token);
   }
 
   async loadDashboard(): Promise<DashboardSummary | null> {
-    const token = this.session.accessToken();
     const branch = this.session.branch();
 
     if (!branch) {
       return null;
     }
 
-    if (!token || isOfflineDemoToken(token)) {
-      return this.loadComputedDashboard(branch.branchId);
+    const computedSummary = await this.loadComputedDashboard(branch.branchId);
+    if (this.session.accessToken() && !isOfflineDemoToken(this.session.accessToken())) {
+      void this.refreshDashboardFromApi(branch.branchId, this.session.accessToken()!);
     }
-
-    try {
-      const summary = await firstValueFrom(this.api.getDashboard(token, branch.branchId));
-      await this.db.dashboard.put(summary);
-      return this.buildComputedDashboard(branch.branchId, summary);
-    } catch {
-      return this.loadComputedDashboard(branch.branchId);
-    }
+    return computedSummary;
   }
 
   async loadPrinters(): Promise<PrinterConfig[]> {
     const token = this.session.accessToken();
-    if (!token || isOfflineDemoToken(token)) {
-      return this.loadCachedOrDemoPrinters();
+    const cachedPrinters = await this.loadCachedOrDemoPrinters();
+    if (cachedPrinters.length > 0) {
+      if (token && !isOfflineDemoToken(token)) {
+        void this.refreshPrintersFromApi(token);
+      }
+      return cachedPrinters;
     }
 
-    try {
-      const printers = await firstValueFrom(this.api.getPrinters(token));
-      await this.db.printers.bulkPut(printers);
-      return printers;
-    } catch {
-      return this.loadCachedOrDemoPrinters();
+    if (!token || isOfflineDemoToken(token)) {
+      return cachedPrinters;
     }
+
+    return this.refreshPrintersFromApi(token);
   }
 
   async loadSyncStatus(): Promise<SyncStatus | null> {
@@ -89,29 +85,34 @@ export class WorkspaceService {
       return null;
     }
 
+    const cacheKey = this.syncStatusKey(branch.branchId, branch.deviceCode);
+    const localStatus = await this.buildLocalSyncStatus(
+      branch.branchId,
+      branch.deviceCode,
+      this.syncStatusCache.get(cacheKey),
+    );
+
     if (!token || isOfflineDemoToken(token)) {
-      return getOfflineDemoSyncStatus(branch.branchId, branch.deviceCode);
+      return localStatus ?? getOfflineDemoSyncStatus(branch.branchId, branch.deviceCode);
     }
 
-    try {
-      return await firstValueFrom(
-        this.api.getSyncStatus(token, branch.branchId, branch.deviceCode),
-      );
-    } catch {
-      return isOfflineDemoToken(token)
-        ? getOfflineDemoSyncStatus(branch.branchId, branch.deviceCode)
-        : null;
-    }
+    void this.refreshSyncStatusFromApi(token, branch.branchId, branch.deviceCode);
+    return localStatus;
   }
 
   private async loadCachedOrDemoCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
+    if (this.catalogCache) {
+      return this.catalogCache;
+    }
+
     const [products, categories] = await Promise.all([
       this.db.products.toArray(),
       this.db.categories.toArray(),
     ]);
 
     if (products.length > 0 && categories.length > 0) {
-      return { products, categories };
+      this.catalogCache = { products, categories };
+      return this.catalogCache;
     }
 
     const demoCatalog = getOfflineDemoCatalog();
@@ -120,10 +121,16 @@ export class WorkspaceService {
       this.db.categories.bulkPut(demoCatalog.categories),
     ]);
 
+    this.catalogCache = demoCatalog;
     return demoCatalog;
   }
 
   private async loadComputedDashboard(branchId: string): Promise<DashboardSummary | null> {
+    const cachedSummary = this.dashboardCache.get(branchId);
+    if (cachedSummary) {
+      return cachedSummary;
+    }
+
     const cached = await this.db.dashboard.get(branchId);
     return this.buildComputedDashboard(branchId, cached ?? getOfflineDemoDashboard(branchId) ?? undefined);
   }
@@ -170,6 +177,7 @@ export class WorkspaceService {
     };
 
     await this.db.dashboard.put(computedSummary);
+    this.dashboardCache.set(branchId, computedSummary);
     return computedSummary;
   }
 
@@ -206,13 +214,113 @@ export class WorkspaceService {
   }
 
   private async loadCachedOrDemoPrinters(): Promise<PrinterConfig[]> {
+    if (this.printersCache) {
+      return this.printersCache;
+    }
+
     const printers = await this.db.printers.toArray();
     if (printers.length > 0) {
+      this.printersCache = printers;
       return printers;
     }
 
     const demoPrinters = getOfflineDemoPrinters();
     await this.db.printers.bulkPut(demoPrinters);
+    this.printersCache = demoPrinters;
     return demoPrinters;
+  }
+
+  private async refreshCatalogFromApi(
+    token: string,
+  ): Promise<{ products: Product[]; categories: Category[] }> {
+    try {
+      const [products, categories] = await Promise.all([
+        firstValueFrom(this.api.getProducts(token).pipe(timeout(WorkspaceService.API_TIMEOUT_MS))),
+        firstValueFrom(this.api.getCategories(token).pipe(timeout(WorkspaceService.API_TIMEOUT_MS))),
+      ]);
+
+      if (products.length === 0 || categories.length === 0) {
+        return this.loadCachedOrDemoCatalog();
+      }
+
+      await this.db.transaction('rw', this.db.products, this.db.categories, async () => {
+        await this.db.products.bulkPut(products);
+        await this.db.categories.bulkPut(categories);
+      });
+
+      this.catalogCache = { products, categories };
+      return this.catalogCache;
+    } catch {
+      return this.loadCachedOrDemoCatalog();
+    }
+  }
+
+  private async refreshDashboardFromApi(token: string, branchId: string): Promise<void> {
+    try {
+      const summary = await firstValueFrom(
+        this.api.getDashboard(token, branchId).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
+      );
+      await this.db.dashboard.put(summary);
+      await this.buildComputedDashboard(branchId, summary);
+    } catch {
+      // Keep the locally computed dashboard when the backend is slow or unavailable.
+    }
+  }
+
+  private async refreshPrintersFromApi(token: string): Promise<PrinterConfig[]> {
+    try {
+      const printers = await firstValueFrom(
+        this.api.getPrinters(token).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
+      );
+      if (printers.length === 0) {
+        return this.loadCachedOrDemoPrinters();
+      }
+
+      await this.db.printers.bulkPut(printers);
+      this.printersCache = printers;
+      return printers;
+    } catch {
+      return this.loadCachedOrDemoPrinters();
+    }
+  }
+
+  private async buildLocalSyncStatus(
+    branchId: string,
+    deviceId: string,
+    remoteStatus?: SyncStatus,
+  ): Promise<SyncStatus> {
+    const queue = await this.db.eventQueue.where('branchId').equals(branchId).toArray();
+    const branchQueue = queue.filter((entry) => entry.deviceId === deviceId);
+    const acknowledgedEvents = branchQueue.filter((entry) => entry.localStatus === 'acknowledged').length;
+    const pendingConflicts = branchQueue.filter((entry) => entry.localStatus === 'conflict').length;
+    const lastCursor = await this.db.syncCursors.get(deviceId);
+
+    return {
+      branchId,
+      deviceId,
+      acceptedEvents: remoteStatus?.acceptedEvents ?? acknowledgedEvents,
+      duplicateEvents: remoteStatus?.duplicateEvents ?? 0,
+      pendingConflicts,
+      serverCursor: remoteStatus?.serverCursor ?? lastCursor?.cursor ?? 'LOCAL_ONLY',
+    };
+  }
+
+  private async refreshSyncStatusFromApi(
+    token: string,
+    branchId: string,
+    deviceId: string,
+  ): Promise<void> {
+    try {
+      const status = await firstValueFrom(
+        this.api.getSyncStatus(token, branchId, deviceId).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
+      );
+      this.syncStatusCache.set(this.syncStatusKey(branchId, deviceId), status);
+    } catch {
+      // Keep the local sync view when the API is slow or unavailable.
+    }
+  }
+
+  private syncStatusKey(branchId: string, deviceId: string): string {
+    return `${branchId}:${deviceId}`;
   }
 }

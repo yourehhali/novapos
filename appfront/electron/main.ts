@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import { writeFile, unlink } from 'node:fs/promises';
 import net from 'node:net';
@@ -91,6 +91,12 @@ type RawPrinterDestination =
     };
 
 const execFileAsync = promisify(execFile);
+const BUSINESS_NAME = 'HOLE MOLE';
+const WIFI_PASSWORD = 'ladiesfirst';
+const BUNDLED_LOGO_PATH = path.join('electron', 'assets', 'logo-black.png');
+const WORKSPACE_LOGO_PATH = '/Users/macadmin/Documents/pos.rox.ma/POS/HoleMole/auth/logo-black.png';
+
+let cachedTicketLogo: Electron.NativeImage | null | undefined;
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -481,29 +487,27 @@ if (-not [RawPrinterHelper]::SendBytesToPrinter($printerName, $bytes)) {
 function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
   const width = getCharactersPerLine(request.printer);
   const chunks: Buffer[] = [];
+  const printedAt = formatDateTime(
+    request.kind === 'KITCHEN'
+      ? request.order.kitchenPrintedAt || request.order.createdAt
+      : request.order.paidAt || request.order.createdAt,
+  );
 
   chunks.push(escposInit());
-  chunks.push(alignCenter());
-  chunks.push(doubleHeightWidth(true));
-  chunks.push(textLine(request.kind === 'KITCHEN' ? 'TICKET CUISINE' : 'TICKET PAIEMENT'));
-  chunks.push(doubleHeightWidth(false));
-  chunks.push(bold(true));
-  chunks.push(textLine(sanitizeForEscPos(request.order.orderNumber)));
-  chunks.push(bold(false));
-  chunks.push(
-    textLine(
-      `${request.kind === 'KITCHEN' ? 'PREPARE' : 'PAYE'} ${formatDateTime(
-        request.kind === 'KITCHEN'
-          ? request.order.kitchenPrintedAt || request.order.createdAt
-          : request.order.paidAt || request.order.createdAt,
-      )}`,
-    ),
+  appendTicketHeader(
+    chunks,
+    request.printer,
+    request.kind === 'KITCHEN' ? 'TICKET CUISINE' : 'TICKET PAIEMENT',
+    [
+      request.order.orderNumber,
+      `${request.kind === 'KITCHEN' ? 'PREPARE' : 'PAYE'} ${printedAt}`,
+    ],
   );
   chunks.push(alignLeft());
   chunks.push(textLine('-'.repeat(width)));
 
   if (request.kind === 'PAYMENT') {
-    chunks.push(textLine(formatColumns(['QTE', 'ARTICLE', 'PRIX'], [4, width - 16, 12], ['right', 'left', 'right'])));
+    chunks.push(textLine(lineWithRightAlignedTail('ARTICLE', 'PRIX', width)));
     chunks.push(textLine('-'.repeat(width)));
     for (const line of request.order.lines) {
       for (const renderedLine of formatPaymentEntry(line, width, request.order.currency)) {
@@ -515,9 +519,14 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     chunks.push(textLine(twoColumnLine('TOTAL', formatMoney(request.order.total, request.order.currency), width)));
     chunks.push(bold(false));
     chunks.push(textLine(twoColumnLine('PAIEMENT', sanitizeForEscPos(formatPaymentMethod(request.order.paymentMethod).toUpperCase()), width)));
+    chunks.push(textLine('-'.repeat(width)));
+    chunks.push(alignCenter());
+    chunks.push(textLine('MERCI POUR VOTRE VISITE'));
+      chunks.push(textLine(`WIFI: ${WIFI_PASSWORD}`));
+    chunks.push(alignLeft());
     chunks.push(openDrawerPulse());
   } else {
-    chunks.push(textLine(formatColumns(['QTE', 'ARTICLE'], [4, width - 5], ['right', 'left'])));
+    chunks.push(textLine('ARTICLE'));
     chunks.push(textLine('-'.repeat(width)));
     for (const line of request.order.lines) {
       for (const renderedLine of formatKitchenEntry(line, width)) {
@@ -540,12 +549,10 @@ function buildSalesSummaryEscPosPayload(request: PrintSalesSummaryRequest): Buff
     request.report.range === 'DAY_START' ? 'TOTAL DEBUT JOURNEE' : 'TOTAL DEPUIS DERNIER';
 
   chunks.push(escposInit());
-  chunks.push(alignCenter());
-  chunks.push(doubleHeightWidth(true));
-  chunks.push(textLine(title));
-  chunks.push(doubleHeightWidth(false));
-  chunks.push(textLine(centerText(sanitizeForEscPos(request.report.branchName), width)));
-  chunks.push(textLine(sanitizeForEscPos(formatDateTime(request.report.generatedAt))));
+  appendTicketHeader(chunks, request.printer, title, [
+    request.report.branchName || BUSINESS_NAME,
+    formatDateTime(request.report.generatedAt),
+  ]);
   chunks.push(alignLeft());
   chunks.push(textLine('-'.repeat(width)));
   chunks.push(textLine(`DE ${sanitizeForEscPos(formatDateTime(request.report.fromAt))}`));
@@ -583,38 +590,22 @@ function getCharactersPerLine(printer: PrinterProfile | undefined): number {
 }
 
 function formatPaymentEntry(line: TicketLine, width: number, currency: string): string[] {
-  const amountWidth = width <= 32 ? 10 : 12;
-  const quantityWidth = 4;
-  const itemWidth = Math.max(8, width - quantityWidth - amountWidth - 2);
-  const wrappedName = wrapText(sanitizeForEscPos(line.name), itemWidth);
-  const formattedLines = [
-    formatColumns(
-      [String(line.quantity), wrappedName[0], formatMoney(line.total, currency)],
-      [quantityWidth, itemWidth, amountWidth],
-      ['right', 'left', 'right'],
-    ),
-  ];
+  const amount = formatMoney(line.total, currency);
+  const wrappedName = wrapText(
+    sanitizeForEscPos(`${line.quantity} x ${line.name}`),
+    Math.max(8, width - amount.length - 1),
+  );
+  const formattedLines = [lineWithRightAlignedTail(wrappedName[0], amount, width)];
 
   for (const continuation of wrappedName.slice(1)) {
-    formattedLines.push(formatColumns(['', continuation, ''], [quantityWidth, itemWidth, amountWidth], ['right', 'left', 'right']));
+    formattedLines.push(continuation);
   }
 
   return formattedLines;
 }
 
 function formatKitchenEntry(line: TicketLine, width: number): string[] {
-  const quantityWidth = 4;
-  const itemWidth = Math.max(8, width - quantityWidth - 1);
-  const wrappedName = wrapText(sanitizeForEscPos(line.name), itemWidth);
-  const formattedLines = [
-    formatColumns([String(line.quantity), wrappedName[0]], [quantityWidth, itemWidth], ['right', 'left']),
-  ];
-
-  for (const continuation of wrappedName.slice(1)) {
-    formattedLines.push(formatColumns(['', continuation], [quantityWidth, itemWidth], ['right', 'left']));
-  }
-
-  return formattedLines;
+  return wrapText(sanitizeForEscPos(`${line.quantity} x ${line.name}`), width);
 }
 
 function formatSummaryEntry(entry: SalesSummaryEntry, width: number): string[] {
@@ -704,10 +695,114 @@ function twoColumnLine(left: string, right: string, width: number): string {
   return `${sanitizedLeft.slice(0, availableLeft).padEnd(availableLeft, ' ')} ${sanitizedRight}`;
 }
 
+function lineWithRightAlignedTail(left: string, right: string, width: number): string {
+  const sanitizedLeft = sanitizeForEscPos(left);
+  const sanitizedRight = sanitizeForEscPos(right);
+  const availableLeft = Math.max(1, width - sanitizedRight.length - 1);
+  return `${sanitizedLeft.slice(0, availableLeft).padEnd(availableLeft, ' ')} ${sanitizedRight}`;
+}
+
 function centerText(value: string, width: number): string {
   const normalized = sanitizeForEscPos(value).slice(0, width);
   const leftPadding = Math.max(0, Math.floor((width - normalized.length) / 2));
   return `${' '.repeat(leftPadding)}${normalized}`;
+}
+
+function appendTicketHeader(
+  chunks: Buffer[],
+  printer: PrinterProfile | undefined,
+  title: string,
+  metaLines: string[],
+): void {
+  const logoChunk = buildLogoEscPosChunk(printer);
+  chunks.push(alignCenter());
+  if (logoChunk) {
+    chunks.push(logoChunk);
+  }
+  chunks.push(bold(true));
+  chunks.push(textLine(BUSINESS_NAME));
+  chunks.push(bold(false));
+  chunks.push(doubleHeightWidth(true));
+  chunks.push(textLine(title));
+  chunks.push(doubleHeightWidth(false));
+  for (const metaLine of metaLines) {
+    chunks.push(textLine(metaLine));
+  }
+}
+
+function buildLogoEscPosChunk(printer: PrinterProfile | undefined): Buffer | null {
+  const logo = getTicketLogoImage();
+  if (!logo) {
+    return null;
+  }
+
+  const paperWidthMm = printer?.paperWidthMm ?? 80;
+  const maxWidthDots = paperWidthMm <= 58 ? 200 : 280;
+  const maxHeightDots = paperWidthMm <= 58 ? 96 : 116;
+  const sourceSize = logo.getSize();
+  const scale = Math.min(maxWidthDots / sourceSize.width, maxHeightDots / sourceSize.height, 1);
+  const targetWidth = Math.max(8, Math.floor((sourceSize.width * scale) / 8) * 8);
+  const targetHeight = Math.max(8, Math.floor(sourceSize.height * scale));
+  const resized = logo.resize({
+    width: targetWidth,
+    height: targetHeight,
+    quality: 'best',
+  });
+  const bitmap = resized.toBitmap();
+  const widthBytes = Math.ceil(targetWidth / 8);
+  const raster = Buffer.alloc(widthBytes * targetHeight);
+
+  for (let y = 0; y < targetHeight; y += 1) {
+    for (let x = 0; x < targetWidth; x += 1) {
+      const pixelOffset = (y * targetWidth + x) * 4;
+      const blue = bitmap[pixelOffset];
+      const green = bitmap[pixelOffset + 1];
+      const red = bitmap[pixelOffset + 2];
+      const alpha = bitmap[pixelOffset + 3] / 255;
+      const grayscale = (0.299 * red + 0.587 * green + 0.114 * blue) * alpha + 255 * (1 - alpha);
+
+      if (grayscale < 170) {
+        const byteIndex = y * widthBytes + Math.floor(x / 8);
+        raster[byteIndex] |= 0x80 >> (x % 8);
+      }
+    }
+  }
+
+  const header = Buffer.from([
+    0x1d,
+    0x76,
+    0x30,
+    0x00,
+    widthBytes & 0xff,
+    (widthBytes >> 8) & 0xff,
+    targetHeight & 0xff,
+    (targetHeight >> 8) & 0xff,
+  ]);
+
+  return Buffer.concat([header, raster, feedLines(1)]);
+}
+
+function getTicketLogoImage(): Electron.NativeImage | null {
+  if (cachedTicketLogo !== undefined) {
+    return cachedTicketLogo;
+  }
+
+  const logoCandidates = [
+    path.join(app.getAppPath(), BUNDLED_LOGO_PATH),
+    path.join(process.cwd(), BUNDLED_LOGO_PATH),
+    WORKSPACE_LOGO_PATH,
+  ];
+
+  for (const candidate of logoCandidates) {
+    const image = nativeImage.createFromPath(candidate);
+    if (!image.isEmpty()) {
+      cachedTicketLogo = image;
+      return cachedTicketLogo;
+    }
+  }
+
+  cachedTicketLogo = null;
+  return cachedTicketLogo;
 }
 
 function escposInit(): Buffer {

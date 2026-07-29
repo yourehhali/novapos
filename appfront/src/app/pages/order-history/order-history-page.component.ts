@@ -73,7 +73,7 @@ export class OrderHistoryPageComponent implements OnInit {
     }
 
     await this.receiptService.printPaymentTicket(updatedOrder);
-    await this.syncService.runSync();
+    this.syncService.scheduleSync(100);
     await this.reloadOrders();
   }
 

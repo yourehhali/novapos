@@ -56,6 +56,7 @@
     "files": [
       "dist/appfront/browser/**/*",
       "dist-electron/**/*",
+      "electron/assets/**/*",
       "package.json"
     ],
     "asar": true,

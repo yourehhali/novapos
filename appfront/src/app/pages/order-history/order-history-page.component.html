@@ -33,8 +33,8 @@
       <div class="card-top">
         <div class="order-index">{{ orderIndex(order.orderNumber) }}</div>
         <div class="order-head">
-          <strong>{{ order.cashierName }}</strong>
-          <span>{{ order.orderNumber }}</span>
+          <strong>{{ order.orderNumber }}</strong>
+          <span>{{ order.lines.length }} article(s)</span>
         </div>
         <span class="order-badge" [class.paid]="order.status === 'PAID'">
           {{ statusLabel(order.status) }}

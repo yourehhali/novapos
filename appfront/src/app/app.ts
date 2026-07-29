@@ -10,7 +10,7 @@ import { SyncService } from './core/services/sync.service';
 export class App implements OnInit {
   private readonly syncService = inject(SyncService);
 
-  async ngOnInit(): Promise<void> {
-    await this.syncService.runSync();
+  ngOnInit(): void {
+    this.syncService.startBackgroundSync();
   }
 }

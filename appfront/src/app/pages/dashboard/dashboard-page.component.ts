@@ -138,8 +138,14 @@ export class DashboardPageComponent implements OnInit {
   protected readonly pendingQueueDepth = signal(0);
 
   async ngOnInit(): Promise<void> {
-    this.summary.set(await this.workspaceService.loadDashboard());
-    this.syncStatus.set(await this.workspaceService.loadSyncStatus());
-    this.pendingQueueDepth.set(await this.posService.getPendingQueueDepth());
+    const [summary, syncStatus, pendingQueueDepth] = await Promise.all([
+      this.workspaceService.loadDashboard(),
+      this.workspaceService.loadSyncStatus(),
+      this.posService.getPendingQueueDepth(),
+    ]);
+
+    this.summary.set(summary);
+    this.syncStatus.set(syncStatus);
+    this.pendingQueueDepth.set(pendingQueueDepth);
   }
 }
