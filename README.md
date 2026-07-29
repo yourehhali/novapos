@@ -58,36 +58,37 @@ Pass123!
 
 ### Demo Product Categories
 
-- Smash Burgers
-- Burgers
-- Frites & Boissons
-- Tacos
-- Panozzos
-- Pizza Boat
-- Pasticcio & Poutine
-- Desserts & Extras
+- BURGERS
+- SMASH BURGERS
+- PASTICCIO
+- POUTINE
+- PANOZZOS
+- PIZZA BOAT
+- TACOS
+- FRIES
+- DRINKS
+- TAPAS
+- SALADES
+- EXTRAS
+- GLOVO
 
 ### Demo Products
 
 | SKU | Product | Category | Price |
 |---|---|---|---|
-| `SMB-001` | Double Smash Bigboss | Smash Burgers | `65.00 MAD` |
-| `SMB-002` | Smash Cheese Onion | Smash Burgers | `49.00 MAD` |
-| `SMB-005` | Banana Punch | Smash Burgers | `53.00 MAD` |
-| `BRG-001` | Twin Guacamole | Burgers | `67.00 MAD` |
-| `BRG-006` | Nashville | Burgers | `57.00 MAD` |
-| `BRG-009` | El Jefe | Burgers | `71.00 MAD` |
-| `FRD-001` | Frites | Frites & Boissons | `8.00 MAD` |
-| `FRD-017` | Espresso | Frites & Boissons | `8.00 MAD` |
-| `FRD-020` | Iced Spanish Latte | Frites & Boissons | `20.00 MAD` |
-| `TAC-001` | Poulet et Champignons | Tacos | `47.00 MAD` |
-| `TAC-008` | Bang Bang | Tacos | `47.00 MAD` |
-| `PNZ-001` | Amigo | Panozzos | `43.00 MAD` |
-| `PBT-001` | Pizza Boat Pepperoni | Pizza Boat | `48.00 MAD` |
-| `PPO-001` | Diego | Pasticcio & Poutine | `41.00 MAD` |
-| `PPO-005` | Quebecois | Pasticcio & Poutine | `29.00 MAD` |
-| `DEX-001` | Caprese | Desserts & Extras | `35.00 MAD` |
-| `DEX-003` | Burrata | Desserts & Extras | `65.00 MAD` |
+| `BRG-001` | TWIN GUACAMOLE | BURGERS | `67.00 DH` |
+| `SMB-001` | DOUBLE SMASH BIG BOSS | SMASH BURGERS | `65.00 DH` |
+| `PAS-001` | DIEGO | PASTICCIO | `41.00 DH` |
+| `POU-001` | QUEBECOIS | POUTINE | `29.00 DH` |
+| `PNZ-001` | AMIGO | PANOZZOS | `43.00 DH` |
+| `PBT-001` | PEPPERONI | PIZZA BOAT | `48.00 DH` |
+| `TAC-001` | POULET ET CHAMPIGNONS | TACOS | `47.00 DH` |
+| `FRI-001` | FRITES | FRIES | `8.00 DH` |
+| `DRK-007` | ESPRESSO | DRINKS | `8.00 DH` |
+| `TAP-001` | GUACAMOLE CON NACHOS | TAPAS | `25.00 DH` |
+| `SAL-003` | BURRATA | SALADES | `65.00 DH` |
+| `EXT-001` | SAUCE HOLEMOLE | EXTRAS | `5.00 DH` |
+| `GLV-006` | COMBO M | GLOVO | `142.00 DH` |
 
 ### Demo Printer Targets
 
