@@ -503,7 +503,11 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
       `${request.kind === 'KITCHEN' ? 'PREPARE' : 'PAYE'} ${printedAt}`,
     ],
   );
+  chunks.push(textLine(' '.repeat(width)));
+  chunks.push(textLine('COUCOU CAVA ?'));
+  chunks.push(textLine(' '.repeat(width)));
   chunks.push(alignLeft());
+
   chunks.push(textLine('-'.repeat(width)));
 
   if (request.kind === 'PAYMENT') {
@@ -521,7 +525,7 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     chunks.push(textLine(twoColumnLine('PAIEMENT', sanitizeForEscPos(formatPaymentMethod(request.order.paymentMethod).toUpperCase()), width)));
     chunks.push(textLine('-'.repeat(width)));
     chunks.push(alignCenter());
-    chunks.push(textLine('MERCI POUR VOTRE VISITE'));
+    chunks.push(textLine('AH CHOUKRAN'));
       chunks.push(textLine(`WIFI: ${WIFI_PASSWORD}`));
     chunks.push(alignLeft());
     chunks.push(openDrawerPulse());
