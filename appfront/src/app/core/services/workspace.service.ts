@@ -32,15 +32,17 @@ export class WorkspaceService {
 
   async loadCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
     const token = this.session.accessToken();
-    const cachedCatalog = await this.loadCachedOrDemoCatalog();
-    if (cachedCatalog.products.length > 0 && cachedCatalog.categories.length > 0) {
-      if (token && !isOfflineDemoToken(token)) {
-        void this.refreshCatalogFromApi(token);
-      }
+    const shouldForceDemoCatalog = !token || isOfflineDemoToken(token);
+    const cachedCatalog = await this.loadCachedOrDemoCatalog(shouldForceDemoCatalog);
+
+    if (shouldForceDemoCatalog) {
       return cachedCatalog;
     }
 
-    if (!token || isOfflineDemoToken(token)) {
+    if (cachedCatalog.products.length > 0 && cachedCatalog.categories.length > 0) {
+      if (token) {
+        void this.refreshCatalogFromApi(token);
+      }
       return cachedCatalog;
     }
 
@@ -100,7 +102,15 @@ export class WorkspaceService {
     return localStatus;
   }
 
-  private async loadCachedOrDemoCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
+  private async loadCachedOrDemoCatalog(
+    forceDemoCatalog = false,
+  ): Promise<{ products: Product[]; categories: Category[] }> {
+    const demoCatalog = this.normalizeCatalog(getOfflineDemoCatalog());
+
+    if (forceDemoCatalog) {
+      return this.persistCatalog(demoCatalog);
+    }
+
     if (this.catalogCache) {
       return this.catalogCache;
     }
@@ -111,18 +121,64 @@ export class WorkspaceService {
     ]);
 
     if (products.length > 0 && categories.length > 0) {
-      this.catalogCache = { products, categories };
-      return this.catalogCache;
+      const cachedCatalog = this.normalizeCatalog({ products, categories });
+      if (this.hasExpectedCategoryStructure(cachedCatalog, demoCatalog)) {
+        this.catalogCache = cachedCatalog;
+        return this.catalogCache;
+      }
+
+      return this.persistCatalog(demoCatalog);
     }
 
-    const demoCatalog = getOfflineDemoCatalog();
-    await Promise.all([
-      this.db.products.bulkPut(demoCatalog.products),
-      this.db.categories.bulkPut(demoCatalog.categories),
-    ]);
+    return this.persistCatalog(demoCatalog);
+  }
 
-    this.catalogCache = demoCatalog;
-    return demoCatalog;
+  private normalizeCatalog(catalog: {
+    products: Product[];
+    categories: Category[];
+  }): { products: Product[]; categories: Category[] } {
+    const orderedCategories = [...catalog.categories];
+    const categoryOrder = new Map(
+      getOfflineDemoCatalog().categories.map((category, index) => [category.id, index]),
+    );
+    orderedCategories.sort(
+      (left, right) => (categoryOrder.get(left.id) ?? Number.MAX_SAFE_INTEGER)
+        - (categoryOrder.get(right.id) ?? Number.MAX_SAFE_INTEGER),
+    );
+
+    return {
+      products: [...catalog.products],
+      categories: orderedCategories,
+    };
+  }
+
+  private hasExpectedCategoryStructure(
+    candidateCatalog: { products: Product[]; categories: Category[] },
+    expectedCatalog: { products: Product[]; categories: Category[] },
+  ): boolean {
+    if (candidateCatalog.categories.length !== expectedCatalog.categories.length) {
+      return false;
+    }
+
+    return expectedCatalog.categories.every((category, index) => {
+      const candidate = candidateCatalog.categories[index];
+      return candidate?.id === category.id && candidate?.name === category.name;
+    });
+  }
+
+  private async persistCatalog(catalog: {
+    products: Product[];
+    categories: Category[];
+  }): Promise<{ products: Product[]; categories: Category[] }> {
+    await this.db.transaction('rw', this.db.products, this.db.categories, async () => {
+      await this.db.products.clear();
+      await this.db.categories.clear();
+      await this.db.products.bulkPut(catalog.products);
+      await this.db.categories.bulkPut(catalog.categories);
+    });
+
+    this.catalogCache = this.normalizeCatalog(catalog);
+    return this.catalogCache;
   }
 
   private async loadComputedDashboard(branchId: string): Promise<DashboardSummary | null> {
@@ -243,12 +299,15 @@ export class WorkspaceService {
         return this.loadCachedOrDemoCatalog();
       }
 
+      const normalizedCatalog = this.normalizeCatalog({ products, categories });
       await this.db.transaction('rw', this.db.products, this.db.categories, async () => {
-        await this.db.products.bulkPut(products);
-        await this.db.categories.bulkPut(categories);
+        await this.db.products.clear();
+        await this.db.categories.clear();
+        await this.db.products.bulkPut(normalizedCatalog.products);
+        await this.db.categories.bulkPut(normalizedCatalog.categories);
       });
 
-      this.catalogCache = { products, categories };
+      this.catalogCache = normalizedCatalog;
       return this.catalogCache;
     } catch {
       return this.loadCachedOrDemoCatalog();
