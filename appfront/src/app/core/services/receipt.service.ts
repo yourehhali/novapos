@@ -12,7 +12,7 @@ import { DesktopBridgeService } from './desktop-bridge.service';
 import { WorkspaceService } from './workspace.service';
 
 type TicketKind = PrintTicketRequest['kind'];
-const HARDCODED_PRINTER_NAME = 'EPSON TM-T20II Receipt';
+const HARDCODED_PRINTER_NAME = 'printer WD8260';
 
 @Injectable({ providedIn: 'root' })
 export class ReceiptService {
