@@ -91,7 +91,7 @@ type RawPrinterDestination =
     };
 
 const execFileAsync = promisify(execFile);
-const BUSINESS_NAME = 'HOLE MOLE';
+const BUSINESS_NAME = 'Rox Agency';
 const WIFI_PASSWORD = 'ladiesfirst';
 const BUNDLED_LOGO_PATH = path.join('electron', 'assets', 'logo-black.png');
 const WORKSPACE_LOGO_PATH = '/Users/macadmin/Documents/pos.rox.ma/POS/HoleMole/auth/logo-black.png';
@@ -504,7 +504,7 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     ],
   );
   chunks.push(textLine(' '.repeat(width)));
-  chunks.push(textLine('COUCOU CAVA ?'));
+  chunks.push(textLine('Hello Ticket'));
   chunks.push(textLine(' '.repeat(width)));
   chunks.push(alignLeft());
 
@@ -525,8 +525,7 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     chunks.push(textLine(twoColumnLine('PAIEMENT', sanitizeForEscPos(formatPaymentMethod(request.order.paymentMethod).toUpperCase()), width)));
     chunks.push(textLine('-'.repeat(width)));
     chunks.push(alignCenter());
-    chunks.push(textLine('AH CHOUKRAN'));
-      chunks.push(textLine(`WIFI: ${WIFI_PASSWORD}`));
+    chunks.push(textLine('Thank You!'));
     chunks.push(alignLeft());
     chunks.push(openDrawerPulse());
   } else {

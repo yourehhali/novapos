@@ -1,0 +1,36 @@
+*{
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+}
+body{
+    width: 100svw;
+    height: 100svh;
+}
+.app{
+    height: 100%;
+    width: 100%;
+    display: flex;
+    background-color: #e0e0e0;
+    flex-direction: row;
+    gap: 20px;
+}
+.sidebar{
+    width: 100px;
+    max-width: 200px;
+    height: 100%;
+    display: flex;
+    padding: 25px;
+    flex-direction: column;
+    background-color: #055D2D;
+    align-items: center;
+    justify-content: space-between;
+
+}
+.sidebar img{
+    width: 50px;
+}
+.content{
+    background-color: white;
+    width: 100%;
+}

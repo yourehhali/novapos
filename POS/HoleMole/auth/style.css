@@ -19,7 +19,13 @@
     padding: 46px;
 }
 .right-side{
-    background-color: #fff4d9;
+    background-color: #f6f6f6;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    height: 100%;
+    align-items: center;
+    justify-content: center;
     width: 40%;
 }
 .logo{
@@ -38,24 +44,78 @@
 .logo-container .text{
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
 }
 .logo-container .text h1{
     font-weight: 600;
-    font-size: 36px;
+    font-size: 24px;
     letter-spacing: -6%;
     word-spacing: -5%;
     font-family: Unbounded;
 }
 .logo-container .text p{
-    font-size: 18px;
+    font-size: 14x;
     font-weight: 700;
     opacity: 60%;
 }
 .middle-container{
     font-family: Unbounded;
     font-weight: 800;
+    display: flex;
+    flex-direction: column;
+    gap: 30px;
 }
 .middle-container h2{
     font-size: 36px;
+}
+.middle-container .time{
+    font-size: 120px;
+    letter-spacing: -10%;
+    font-weight: 100;
+}
+
+.divider{
+    display: block;
+    height: 6px;
+    width: 120px;
+    border-radius: 6px;
+    background-color: #EB9A05;
+}
+.dot{
+    display: block;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    border: solid 2px #afafaf;
+    opacity: 50%;
+}
+.input-status{
+    display: flex;
+    gap: 12px;
+}
+.grid-input-container{
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    width: 80%;
+    gap: 12px;
+}
+.digit,.delete{
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    background-color: white;
+    color: #055D2D;
+    font-weight: 800;
+    border-radius: 8px;
+    background-color: #ffffff;
+}
+.delete{
+    background-color: #ffb6b677;
+    color: #ff2626;
+}
+.delete svg{
+    width: 16px;
+    height: 16px;
 }
