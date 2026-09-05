@@ -6,7 +6,6 @@
       <span class="summary-note">{{ summaryPrintedLabel() }}</span>
     </div>
     <div class="page-actions">
-      <p class="page-note">Les commandes restent disponibles localement sur cet appareil, meme hors ligne.</p>
       <div class="summary-actions">
         <button
           type="button"
@@ -28,8 +27,31 @@
     </div>
   </header>
 
-  <div class="orders-grid" *ngIf="orders().length; else emptyState">
-    <article class="order-card" *ngFor="let order of orders()">
+  <nav class="tabs" role="tablist">
+    <button
+      type="button"
+      role="tab"
+      class="tab-button"
+      [class.active]="activeTab() === 'PREPARED'"
+      (click)="switchTab('PREPARED')"
+    >
+      <span>En preparation</span>
+      <strong>{{ preparedOrders().length }}</strong>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="tab-button"
+      [class.active]="activeTab() === 'PAID'"
+      (click)="switchTab('PAID')"
+    >
+      <span>Payees</span>
+      <strong>{{ paidOrders().length }}</strong>
+    </button>
+  </nav>
+
+  <div class="orders-grid" *ngIf="paginatedOrders().length; else emptyState">
+    <article class="order-card" *ngFor="let order of paginatedOrders()">
       <div class="card-top">
         <div class="order-index">{{ orderIndex(order.orderNumber) }}</div>
         <div class="order-head">
@@ -113,8 +135,58 @@
 
   <ng-template #emptyState>
     <article class="empty-card">
-      <p>Aucune commande dans l historique.</p>
-      <span>Preparez une commande dans le POS et elle apparaitra ici pour le paiement.</span>
+      <p>Aucune commande dans cet historique.</p>
+      <span>
+        {{ activeTab() === 'PREPARED'
+          ? 'Preparez une commande dans le POS et elle apparaitra ici pour le paiement.'
+          : 'Aucune commande n a encore ete payee aujourd hui.' }}
+      </span>
     </article>
   </ng-template>
+
+  <nav class="pagination" *ngIf="activeOrders().length > PAGE_SIZE" aria-label="Pagination">
+    <button
+      type="button"
+      class="page-button"
+      (click)="goToPage(page() - 1)"
+      [disabled]="page() === 1"
+    >
+      &larr;
+    </button>
+    <button
+      *ngIf="pageNumbers()[0] > 1"
+      type="button"
+      class="page-button"
+      (click)="goToPage(1)"
+    >
+      1
+    </button>
+    <span *ngIf="pageNumbers()[0] > 2" class="page-ellipsis">...</span>
+    <button
+      *ngFor="let n of pageNumbers()"
+      type="button"
+      class="page-button"
+      [class.active]="n === page()"
+      (click)="goToPage(n)"
+    >
+      {{ n }}
+    </button>
+    <span *ngIf="pageNumbers()[pageNumbers().length - 1] < totalPages() - 1" class="page-ellipsis">...</span>
+    <button
+      *ngIf="pageNumbers()[pageNumbers().length - 1] < totalPages()"
+      type="button"
+      class="page-button"
+      (click)="goToPage(totalPages())"
+    >
+      {{ totalPages() }}
+    </button>
+    <button
+      type="button"
+      class="page-button"
+      (click)="goToPage(page() + 1)"
+      [disabled]="page() === totalPages()"
+    >
+      &rarr;
+    </button>
+  </nav>
 </section>

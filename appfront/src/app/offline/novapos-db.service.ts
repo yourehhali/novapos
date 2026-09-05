@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import Dexie, { Table } from 'dexie';
 import {
   BootstrapSession,
+  BusinessSettings,
   Category,
   CompletedOrder,
   DashboardSummary,
@@ -34,6 +35,7 @@ export class NovaPosDbService extends Dexie {
   completedOrders!: Table<CompletedOrder, string>;
   syncCursors!: Table<{ id: string; cursor: string }, string>;
   reportPrintStates!: Table<ReportPrintState, string>;
+  businessSettings!: Table<BusinessSettings, 'current'>;
 
   constructor() {
     super('NovaPosDb');
@@ -61,6 +63,20 @@ export class NovaPosDbService extends Dexie {
       completedOrders: 'id, branchId, createdAt',
       syncCursors: 'id',
       reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+    });
+
+    this.version(3).stores({
+      sessionContext: 'id',
+      bootstrapSessions: 'branchId',
+      products: 'id, categoryId, name',
+      categories: 'id, name',
+      printers: 'id, target',
+      dashboard: 'branchId',
+      eventQueue: 'eventUuid, branchId, deviceId, localStatus, deviceSequence',
+      completedOrders: 'id, branchId, createdAt',
+      syncCursors: 'id',
+      reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+      businessSettings: 'id',
     });
   }
 }

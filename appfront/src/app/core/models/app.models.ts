@@ -176,6 +176,36 @@ export interface ReportPrintState {
   lastPrintedAt: string;
 }
 
+export type LogoType = 'TEXT' | 'IMAGE';
+
+export interface BusinessSettings {
+  id: 'current';
+  businessName: string;
+  addressLine1: string;
+  addressLine2: string;
+  phone: string;
+  taxLabel: string;
+  taxNumber: string;
+  logoType: LogoType;
+  logoText: string;
+  logoImageDataUrl: string;
+  ticketHeading: string;
+  ticketSubheading: string;
+  footerLine1: string;
+  footerLine2: string;
+  footerLine3: string;
+  receiptPrinterName: string;
+  receiptQueueName: string;
+  receiptPrinterIp: string;
+  receiptPaperWidthMm: 58 | 80;
+  kitchenPrinterName: string;
+  kitchenQueueName: string;
+  kitchenPrinterIp: string;
+  kitchenPaperWidthMm: 58 | 80;
+  currency: string;
+  updatedAt: string;
+}
+
 export interface DesktopRuntimeInfo {
   isDesktop: boolean;
   platform: string;

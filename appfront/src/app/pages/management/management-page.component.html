@@ -1,0 +1,579 @@
+<section class="management-page">
+  <header class="page-header">
+    <div class="page-title">
+      <p class="eyebrow">Administration</p>
+      <h1>Gestion produits & categories</h1>
+    </div>
+    <div class="page-actions" *ngIf="pinAuthed()">
+      <button type="button" class="secondary-button" (click)="lockScreen()">Verrouiller</button>
+    </div>
+  </header>
+
+  <!-- PIN gate -->
+  <article class="pin-gate" *ngIf="!pinAuthed()">
+    <div class="pin-card">
+      <p class="eyebrow">Acces protege</p>
+      <h2>Saisissez le code PIN</h2>
+
+      <label class="pin-field">
+        <input
+          type="password"
+          inputmode="numeric"
+          autocomplete="off"
+          maxlength="6"
+          placeholder="• • • • • •"
+          [ngModel]="pinInput()"
+          (keyup.enter)="submitPin()"
+          (ngModelChange)="pinInput.set($event)"
+        />
+      </label>
+
+      <div class="pin-error" *ngIf="pinError() as error">
+        {{ error }}
+      </div>
+
+      <button type="button" class="primary-button" (click)="submitPin()">
+        Acceder a la gestion
+      </button>
+    </div>
+  </article>
+
+  <ng-container *ngIf="pinAuthed()">
+    <!-- Tabs -->
+    <nav class="tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        class="tab-button"
+        [class.active]="activeTab() === 'products'"
+        (click)="switchTab('products')"
+      >
+        <span>Produits</span>
+        <strong>{{ products().length }}</strong>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-button"
+        [class.active]="activeTab() === 'categories'"
+        (click)="switchTab('categories')"
+      >
+        <span>Categories</span>
+        <strong>{{ categories().length }}</strong>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-button"
+        [class.active]="activeTab() === 'settings'"
+        (click)="switchTab('settings')"
+      >
+        <span>Entreprise</span>
+      </button>
+    </nav>
+
+    <!-- PRODUCTS TAB -->
+    <div class="tab-pane" *ngIf="activeTab() === 'products'">
+      <div class="toolbar">
+        <input
+          class="search-input"
+          placeholder="Rechercher un produit, SKU ou categorie..."
+          [ngModel]="productSearch()"
+          (ngModelChange)="productSearch.set($event)"
+        />
+        <button type="button" class="primary-button" (click)="newProduct()">+ Nouveau produit</button>
+      </div>
+
+      <div class="form-card" *ngIf="editingProduct() as product">
+        <p class="form-eyebrow">{{ isNewProduct(product) ? 'Nouveau produit' : 'Modifier produit' }}</p>
+
+        <div class="form-error" *ngIf="saveError()">
+          {{ saveError() }}
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Nom *</span>
+            <input
+              type="text"
+              [ngModel]="product.name"
+              (ngModelChange)="setProductField('name', $event)"
+              placeholder="Ex: Guacamole con Nachos"
+            />
+          </label>
+
+          <label>
+            <span>SKU *</span>
+            <input
+              type="text"
+              [ngModel]="product.sku"
+              (ngModelChange)="setProductField('sku', $event)"
+              placeholder="Ex: TAP-001"
+            />
+          </label>
+
+          <label>
+            <span>Categorie *</span>
+            <select
+              [ngModel]="product.categoryId"
+              (ngModelChange)="setProductField('categoryId', $event)"
+            >
+              <option value="" disabled>Choisir une categorie</option>
+              <option *ngFor="let c of categories()" [value]="c.id">{{ c.name }}</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Prix ({{ product.currency }}) *</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              [ngModel]="product.price"
+              (ngModelChange)="setProductPrice($event)"
+            />
+          </label>
+
+          <label class="checkbox">
+            <input
+              type="checkbox"
+              [checked]="product.available"
+              (change)="setProductAvailable($event)"
+            />
+            Disponible a la vente
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="secondary-button" (click)="cancelProduct()">Annuler</button>
+          <button type="button" class="primary-button" (click)="saveProduct()">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>SKU</th>
+              <th>Categorie</th>
+              <th style="text-align: right;">Prix</th>
+              <th>Statut</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let p of filteredProducts()">
+              <td>
+                <strong>{{ p.name }}</strong>
+              </td>
+              <td class="muted">{{ p.sku }}</td>
+              <td>{{ categoryName(p.categoryId) }}</td>
+              <td class="num">{{ p.price | number: '1.2-2' }} {{ p.currency }}</td>
+              <td>
+                <span class="status-pill" [class.ok]="p.available" [class.no]="!p.available">
+                  {{ p.available ? 'Disponible' : 'Desactive' }}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button type="button" class="row-link" (click)="editProduct(p)">Modifier</button>
+                <button type="button" class="row-link danger" (click)="deleteProduct(p)">Supprimer</button>
+              </td>
+            </tr>
+            <tr *ngIf="filteredProducts().length === 0">
+              <td colspan="6" class="empty-row">
+                Aucun produit. Cliquez sur "+ Nouveau produit" pour commencer.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CATEGORIES TAB -->
+    <div class="tab-pane" *ngIf="activeTab() === 'categories'">
+      <div class="toolbar">
+        <div></div>
+        <button type="button" class="primary-button" (click)="newCategory()">+ Nouvelle categorie</button>
+      </div>
+
+      <div class="form-card" *ngIf="editingCategory() as category">
+        <p class="form-eyebrow">{{ isNewCategory(category) ? 'Nouvelle categorie' : 'Modifier categorie' }}</p>
+
+        <div class="form-error" *ngIf="saveError()">
+          {{ saveError() }}
+        </div>
+
+        <div class="form-grid">
+          <label>
+            <span>Nom *</span>
+            <input
+              type="text"
+              [ngModel]="category.name"
+              (ngModelChange)="setCategoryField('name', $event)"
+              placeholder="Ex: Tapas"
+            />
+          </label>
+
+          <label>
+            <span>Description</span>
+            <input
+              type="text"
+              [ngModel]="category.description"
+              (ngModelChange)="setCategoryField('description', $event)"
+              placeholder="Courte description (optionnel)"
+            />
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="secondary-button" (click)="cancelCategory()">Annuler</button>
+          <button type="button" class="primary-button" (click)="saveCategory()">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nom</th>
+              <th>Description</th>
+              <th style="text-align: right;">Produits</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let c of categories()">
+              <td>
+                <strong>{{ c.name }}</strong>
+              </td>
+              <td class="muted">{{ c.description || '-' }}</td>
+              <td class="num">{{ productCountForCategory(c.id) }}</td>
+              <td class="actions-cell">
+                <button type="button" class="row-link" (click)="editCategory(c)">Modifier</button>
+                <button type="button" class="row-link danger" (click)="deleteCategory(c)">Supprimer</button>
+              </td>
+            </tr>
+            <tr *ngIf="categories().length === 0">
+              <td colspan="4" class="empty-row">
+                Aucune categorie. Cliquez sur "+ Nouvelle categorie" pour commencer.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- BUSINESS SETTINGS TAB -->
+    <div class="tab-pane" *ngIf="activeTab() === 'settings' && editingSettings() as s">
+      <div class="form-card" *ngIf="saveSettingsError()">
+        <div class="form-error">
+          {{ saveSettingsError() }}
+        </div>
+      </div>
+
+      <div class="form-card" *ngIf="saveSettingsSuccess()">
+        <div class="form-success">
+          {{ saveSettingsSuccess() }}
+        </div>
+      </div>
+
+      <!-- Identity block -->
+      <div class="settings-block">
+        <p class="block-title">Identite de l entreprise</p>
+        <div class="form-grid">
+          <label>
+            <span>Nom de l entreprise *</span>
+            <input
+              type="text"
+              [ngModel]="s.businessName"
+              (ngModelChange)="setSettingsField('businessName', $event)"
+              placeholder="Ex: Hole Mole"
+            />
+          </label>
+          <label>
+            <span>Telephone</span>
+            <input
+              type="text"
+              [ngModel]="s.phone"
+              (ngModelChange)="setSettingsField('phone', $event)"
+              placeholder="Ex: +212 522 00 00 00"
+            />
+          </label>
+          <label>
+            <span>Adresse ligne 1</span>
+            <input
+              type="text"
+              [ngModel]="s.addressLine1"
+              (ngModelChange)="setSettingsField('addressLine1', $event)"
+              placeholder="Ex: 123 avenue Hassan II"
+            />
+          </label>
+          <label>
+            <span>Adresse ligne 2</span>
+            <input
+              type="text"
+              [ngModel]="s.addressLine2"
+              (ngModelChange)="setSettingsField('addressLine2', $event)"
+              placeholder="Etage, quartier (optionnel)"
+            />
+          </label>
+          <label>
+            <span>Libelle impot / taxe</span>
+            <input
+              type="text"
+              [ngModel]="s.taxLabel"
+              (ngModelChange)="setSettingsField('taxLabel', $event)"
+              placeholder="Ex: IF, ICE, TVA"
+            />
+          </label>
+          <label>
+            <span>Numero impot / taxe</span>
+            <input
+              type="text"
+              [ngModel]="s.taxNumber"
+              (ngModelChange)="setSettingsField('taxNumber', $event)"
+              placeholder="Ex: 123456789"
+            />
+          </label>
+          <label>
+            <span>Devise d affichage</span>
+            <input
+              type="text"
+              [ngModel]="s.currency"
+              (ngModelChange)="setSettingsField('currency', $event)"
+              placeholder="Ex: DH, EUR, $"
+            />
+          </label>
+        </div>
+      </div>
+
+      <!-- Logo block -->
+      <div class="settings-block">
+        <p class="block-title">Logo du tiquet</p>
+        <div class="logo-type-row">
+          <label class="radio-pill">
+            <input
+              type="radio"
+              name="logoType"
+              value="TEXT"
+              [checked]="s.logoType === 'TEXT'"
+              (change)="setSettingsLogoType('TEXT')"
+            />
+            <span>Texte</span>
+          </label>
+          <label class="radio-pill">
+            <input
+              type="radio"
+              name="logoType"
+              value="IMAGE"
+              [checked]="s.logoType === 'IMAGE'"
+              (change)="setSettingsLogoType('IMAGE')"
+            />
+            <span>Image</span>
+          </label>
+        </div>
+
+        <div class="logo-config" *ngIf="s.logoType === 'TEXT'">
+          <div class="form-grid">
+            <label style="grid-column: 1 / -1;">
+              <span>Texte du logo (court, 4-14 caracteres recommandes)</span>
+              <input
+                type="text"
+                maxlength="14"
+                [ngModel]="s.logoText"
+                (ngModelChange)="setSettingsField('logoText', $event)"
+                placeholder="Ex: HM"
+              />
+            </label>
+          </div>
+          <div class="logo-preview ticket-preview">
+            <span class="logo-text-preview">{{ s.logoText?.trim() || s.businessName?.slice(0,14) || 'HM' }}</span>
+          </div>
+        </div>
+
+        <div class="logo-config" *ngIf="s.logoType === 'IMAGE'">
+          <div class="form-grid">
+            <label>
+              <span>Choisir une image (PNG/JPG, max 1.5 Mo)</span>
+              <input
+                type="file"
+                accept="image/*"
+                (change)="handleLogoImageFile($event)"
+              />
+            </label>
+          </div>
+          <div class="logo-preview ticket-preview">
+            <img
+              *ngIf="s.logoImageDataUrl"
+              class="logo-image-preview"
+              [src]="s.logoImageDataUrl"
+              alt="logo preview"
+            />
+            <div *ngIf="!s.logoImageDataUrl" class="logo-preview-empty">
+              Aucune image selectionnee
+            </div>
+          </div>
+          <button
+            type="button"
+            class="secondary-button"
+            *ngIf="s.logoImageDataUrl"
+            (click)="clearLogoImage()"
+          >
+            Supprimer l image
+          </button>
+        </div>
+      </div>
+
+      <!-- Ticket text block -->
+      <div class="settings-block">
+        <p class="block-title">Textes du tiquet</p>
+        <div class="form-grid">
+          <label>
+            <span>Titre du tiquet</span>
+            <input
+              type="text"
+              [ngModel]="s.ticketHeading"
+              (ngModelChange)="setSettingsField('ticketHeading', $event)"
+              placeholder="Ex: Ticket Commande"
+            />
+          </label>
+          <label>
+            <span>Sous-titre du tiquet</span>
+            <input
+              type="text"
+              [ngModel]="s.ticketSubheading"
+              (ngModelChange)="setSettingsField('ticketSubheading', $event)"
+              placeholder="Optionnel - sous le titre"
+            />
+          </label>
+          <label>
+            <span>Ligne pied de page 1</span>
+            <input
+              type="text"
+              [ngModel]="s.footerLine1"
+              (ngModelChange)="setSettingsField('footerLine1', $event)"
+              placeholder="Ex: Merci pour votre visite"
+            />
+          </label>
+          <label>
+            <span>Ligne pied de page 2</span>
+            <input
+              type="text"
+              [ngModel]="s.footerLine2"
+              (ngModelChange)="setSettingsField('footerLine2', $event)"
+              placeholder="Ex: A bientot"
+            />
+          </label>
+          <label style="grid-column: 1 / -1;">
+            <span>Ligne pied de page 3</span>
+            <input
+              type="text"
+              [ngModel]="s.footerLine3"
+              (ngModelChange)="setSettingsField('footerLine3', $event)"
+              placeholder="Optionnel"
+            />
+          </label>
+        </div>
+      </div>
+
+      <!-- Printers block -->
+      <div class="settings-block">
+        <p class="block-title">Imprimantes</p>
+        <div class="printers-grid">
+          <!-- Receipt printer card -->
+          <div class="printer-card">
+            <p class="printer-title">Imprimante paiement (ticket)</p>
+            <div class="form-grid">
+              <label>
+                <span>Nom de l imprimante</span>
+                <input
+                  type="text"
+                  [ngModel]="s.receiptPrinterName"
+                  (ngModelChange)="setSettingsField('receiptPrinterName', $event)"
+                  placeholder="Ex: TM-T20II Ticket"
+                />
+              </label>
+              <label>
+                <span>Nom de la file / queue (Windows)</span>
+                <input
+                  type="text"
+                  [ngModel]="s.receiptQueueName"
+                  (ngModelChange)="setSettingsField('receiptQueueName', $event)"
+                  placeholder="Ex: EPSON-TM-T20"
+                />
+              </label>
+              <label>
+                <span>Adresse IP (reseau ESC/POS)</span>
+                <input
+                  type="text"
+                  [ngModel]="s.receiptPrinterIp"
+                  (ngModelChange)="setSettingsField('receiptPrinterIp', $event)"
+                  placeholder="Ex: 192.168.1.12 (vide = impression navigateur)"
+                />
+              </label>
+              <label>
+                <span>Largeur papier</span>
+                <select
+                  [ngModel]="s.receiptPaperWidthMm"
+                  (ngModelChange)="setSettingsReceiptWidth($event)"
+                >
+                  <option [ngValue]="80">80 mm (standard)</option>
+                  <option [ngValue]="58">58 mm (compact)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+
+          <!-- Kitchen printer card -->
+          <div class="printer-card">
+            <p class="printer-title">Imprimante cuisine (KOT)</p>
+            <div class="form-grid">
+              <label>
+                <span>Nom de l imprimante</span>
+                <input
+                  type="text"
+                  [ngModel]="s.kitchenPrinterName"
+                  (ngModelChange)="setSettingsField('kitchenPrinterName', $event)"
+                  placeholder="Ex: TM-T20II Cuisine"
+                />
+              </label>
+              <label>
+                <span>Nom de la file / queue (Windows)</span>
+                <input
+                  type="text"
+                  [ngModel]="s.kitchenQueueName"
+                  (ngModelChange)="setSettingsField('kitchenQueueName', $event)"
+                  placeholder="Ex: EPSON-CUISINE"
+                />
+              </label>
+              <label>
+                <span>Adresse IP (reseau ESC/POS)</span>
+                <input
+                  type="text"
+                  [ngModel]="s.kitchenPrinterIp"
+                  (ngModelChange)="setSettingsField('kitchenPrinterIp', $event)"
+                  placeholder="Ex: 192.168.1.13 (vide = impression navigateur)"
+                />
+              </label>
+              <label>
+                <span>Largeur papier</span>
+                <select
+                  [ngModel]="s.kitchenPaperWidthMm"
+                  (ngModelChange)="setSettingsKitchenWidth($event)"
+                >
+                  <option [ngValue]="80">80 mm (standard)</option>
+                  <option [ngValue]="58">58 mm (compact)</option>
+                </select>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" class="primary-button" (click)="saveSettings()">Enregistrer</button>
+      </div>
+    </div>
+  </ng-container>
+</section>

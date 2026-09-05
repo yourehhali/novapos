@@ -6,12 +6,12 @@
           <p class="eyebrow">Ticket commande</p>
           <h1>Commande en cours</h1>
         </div>
-        <span class="status-pill">Preparer d abord, payer ensuite</span>
       </div>
 
-      <div class="helper-card">
-        Cliquer sur <strong>Preparer</strong> envoie le ticket a l imprimante cuisine et enregistre
-        la commande localement. Le paiement se fait ensuite depuis <strong>Historique</strong>.
+      <div class="editing-banner" *ngIf="pos.editingPreparedOrderId() && pos.lastOrder()">
+        <strong>Modification en cours</strong>
+        <span>Vous editez la commande {{ pos.lastOrder()!.orderNumber }}. Vos modifications remplaceront la commande existante.</span>
+        <button type="button" class="cancel-edit-button" (click)="pos.clearCart()">Annuler</button>
       </div>
 
       <div class="cart-list" *ngIf="pos.cart().length; else emptyCart">
@@ -51,7 +51,7 @@
         Vider
       </button>
       <button type="button" class="checkout-button" [disabled]="busy() || pos.cart().length === 0" (click)="prepare()">
-        {{ busy() ? 'Preparation...' : 'Preparer' }}
+        {{ busy() ? (pos.editingPreparedOrderId() ? 'Mise a jour...' : 'Preparation...') : (pos.editingPreparedOrderId() ? 'Mettre a jour' : 'Preparer') }}
       </button>
     </div>
 
@@ -111,7 +111,7 @@
     <div class="divider"></div>
 
     <div class="product-grid">
-      <article class="product-card" *ngFor="let product of filteredProducts()">
+      <article class="product-card" *ngFor="let product of filteredProducts()" (click)="add(product)">
         <div class="product-info">
           <strong>{{ product.name }}</strong>
           <span>{{ categoryName(product.categoryId) }}</span>
@@ -121,7 +121,7 @@
         <div class="product-footer">
           <em>{{ product.price | number: '1.2-2' }} DH</em>
 
-          <div class="product-actions">
+          <div class="product-actions" (click)="$event.stopPropagation()">
             <button
               type="button"
               class="qty-button"

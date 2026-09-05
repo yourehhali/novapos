@@ -94,13 +94,34 @@ const execFileAsync = promisify(execFile);
 const BUSINESS_NAME = 'Rox Agency';
 const WIFI_PASSWORD = 'ladiesfirst';
 const BUNDLED_LOGO_PATH = path.join('electron', 'assets', 'logo-black.png');
+const BUNDLED_APP_ICON_PATH = path.join('media', 'icon.png');
 const WORKSPACE_LOGO_PATH = '/Users/macadmin/Documents/pos.rox.ma/POS/HoleMole/auth/logo-black.png';
 
 let cachedTicketLogo: Electron.NativeImage | null | undefined;
+let cachedAppIcon: Electron.NativeImage | null | undefined;
+
+function getAppIcon(): Electron.NativeImage | null {
+  if (cachedAppIcon !== undefined) return cachedAppIcon;
+
+  const candidates = [
+    path.join(app.getAppPath(), BUNDLED_APP_ICON_PATH),
+    path.join(process.cwd(), BUNDLED_APP_ICON_PATH),
+  ];
+  for (const candidate of candidates) {
+    const image = nativeImage.createFromPath(candidate);
+    if (!image.isEmpty()) {
+      cachedAppIcon = image;
+      return cachedAppIcon;
+    }
+  }
+  cachedAppIcon = null;
+  return cachedAppIcon;
+}
 
 let mainWindow: BrowserWindow | null = null;
 
 function createMainWindow(): BrowserWindow {
+  const appIcon = getAppIcon();
   const window = new BrowserWindow({
     width: 1520,
     height: 960,
@@ -108,6 +129,7 @@ function createMainWindow(): BrowserWindow {
     minHeight: 760,
     backgroundColor: '#0b0f12',
     autoHideMenuBar: true,
+    icon: appIcon ?? undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

@@ -20,6 +20,7 @@ export class PosService {
   readonly cart = signal<PosLine[]>([]);
   readonly paymentMethod = signal<'CASH' | 'CARD'>('CASH');
   readonly lastOrder = signal<CompletedOrder | null>(null);
+  readonly editingPreparedOrderId = signal<string | null>(null);
 
   readonly subtotal = computed(() =>
     this.cart().reduce((sum, line) => sum + line.total, 0),
@@ -59,6 +60,7 @@ export class PosService {
 
   clearCart(): void {
     this.cart.set([]);
+    this.editingPreparedOrderId.set(null);
   }
 
   async prepareOrder(): Promise<CompletedOrder | null> {
@@ -69,9 +71,70 @@ export class PosService {
       return null;
     }
 
-    const orderId = crypto.randomUUID();
     const now = new Date().toISOString();
     const total = this.subtotal();
+    const editingOrderId = this.editingPreparedOrderId();
+
+    if (editingOrderId) {
+      const existingOrder = await this.db.completedOrders.get(editingOrderId);
+      const normalized = existingOrder ? this.normalizeOrder(existingOrder) : null;
+
+      if (!normalized || normalized.status !== 'PREPARED') {
+        this.editingPreparedOrderId.set(null);
+        return this.prepareOrder();
+      }
+
+      const updatedOrder: CompletedOrder = {
+        ...normalized,
+        total,
+        lineCount: this.cart().length,
+        lines: this.cart().map((line) => ({ ...line })),
+        lastUpdatedAt: now,
+        version: normalized.version + 1,
+      };
+
+      const orderEdited = this.createOrderEvent(
+        updatedOrder,
+        'OrderEdited',
+        updatedOrder.version,
+        {
+          orderId: editingOrderId,
+          orderNumber: updatedOrder.orderNumber,
+          lines: updatedOrder.lines,
+          total,
+          cashierId: user.id,
+          status: 'PREPARED',
+        },
+        Date.now(),
+      );
+
+      const kitchenTicketReprinted = this.createOrderEvent(
+        updatedOrder,
+        'KitchenTicketPrinted',
+        updatedOrder.version + 1,
+        {
+          orderId: editingOrderId,
+          orderNumber: updatedOrder.orderNumber,
+          printerTarget: 'KITCHEN',
+          printedAt: now,
+          reprint: true,
+        },
+        Date.now() + 1,
+      );
+
+      await this.db.transaction('rw', this.db.completedOrders, this.db.eventQueue, async () => {
+        await this.db.completedOrders.put(updatedOrder);
+        await this.db.eventQueue.bulkPut([orderEdited, kitchenTicketReprinted]);
+      });
+
+      this.lastOrder.set(updatedOrder);
+      this.cart.set([]);
+      this.editingPreparedOrderId.set(null);
+
+      return updatedOrder;
+    }
+
+    const orderId = crypto.randomUUID();
     const order: CompletedOrder = {
       id: orderId,
       orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
@@ -193,6 +256,7 @@ export class PosService {
 
     this.cart.set(order.lines.map((line) => ({ ...line })));
     this.paymentMethod.set('CASH');
+    this.editingPreparedOrderId.set(orderId);
     this.lastOrder.set(order);
     await this.router.navigateByUrl('/pos');
     return true;

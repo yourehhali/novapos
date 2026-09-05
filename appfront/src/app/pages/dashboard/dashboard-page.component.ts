@@ -1,4 +1,6 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { NavigationEnd, Router } from '@angular/router';
+import { Subject, filter, takeUntil } from 'rxjs';
 import { DashboardSummary, SyncStatus } from '../../core/models/app.models';
 import { PosService } from '../../core/services/pos.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
@@ -95,8 +97,8 @@ import { WorkspaceService } from '../../core/services/workspace.service';
       }
 
       .metric-card.accent {
-        border-color: rgba(20, 200, 255, 0.22);
-        background: linear-gradient(180deg, var(--accent-soft), rgba(20, 200, 255, 0.06));
+        border-color: var(--surface-border);
+        background: var(--surface-raised);
       }
 
       .panel-grid {
@@ -129,15 +131,38 @@ import { WorkspaceService } from '../../core/services/workspace.service';
   ],
   standalone: false,
 })
-export class DashboardPageComponent implements OnInit {
+export class DashboardPageComponent implements OnInit, OnDestroy {
   private readonly workspaceService = inject(WorkspaceService);
   private readonly posService = inject(PosService);
+  private readonly router = inject(Router);
 
   protected readonly summary = signal<DashboardSummary | null>(null);
   protected readonly syncStatus = signal<SyncStatus | null>(null);
   protected readonly pendingQueueDepth = signal(0);
 
+  private readonly destroy$ = new Subject<void>();
+
   async ngOnInit(): Promise<void> {
+    await this.loadData();
+
+    this.router.events
+      .pipe(
+        filter((event) => event instanceof NavigationEnd),
+        takeUntil(this.destroy$),
+      )
+      .subscribe(async (event) => {
+        if ((event as NavigationEnd).urlAfterRedirects.startsWith('/dashboard')) {
+          await this.loadData();
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
+  private async loadData(): Promise<void> {
     const [summary, syncStatus, pendingQueueDepth] = await Promise.all([
       this.workspaceService.loadDashboard(),
       this.workspaceService.loadSyncStatus(),

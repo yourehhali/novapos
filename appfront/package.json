@@ -57,6 +57,7 @@
       "dist/appfront/browser/**/*",
       "dist-electron/**/*",
       "electron/assets/**/*",
+      "media/**/*",
       "package.json"
     ],
     "asar": true,
@@ -65,7 +66,8 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "icon": "media/icon.png"
     },
     "win": {
       "target": [
@@ -81,7 +83,11 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "media/icon.png"
+    },
+    "linux": {
+      "icon": "media/icon.png"
     },
     "nsis": {
       "oneClick": false,

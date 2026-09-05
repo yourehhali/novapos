@@ -27,8 +27,6 @@ export class WorkspaceService {
   private readonly session = inject(SessionService);
   private catalogCache: { products: Product[]; categories: Category[] } | null = null;
   private printersCache: PrinterConfig[] | null = null;
-  private readonly dashboardCache = new Map<string, DashboardSummary>();
-  private readonly syncStatusCache = new Map<string, SyncStatus>();
 
   async loadCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
     const token = this.session.accessToken();
@@ -87,11 +85,10 @@ export class WorkspaceService {
       return null;
     }
 
-    const cacheKey = this.syncStatusKey(branch.branchId, branch.deviceCode);
     const localStatus = await this.buildLocalSyncStatus(
       branch.branchId,
       branch.deviceCode,
-      this.syncStatusCache.get(cacheKey),
+      undefined,
     );
 
     if (!token || isOfflineDemoToken(token)) {
@@ -182,11 +179,6 @@ export class WorkspaceService {
   }
 
   private async loadComputedDashboard(branchId: string): Promise<DashboardSummary | null> {
-    const cachedSummary = this.dashboardCache.get(branchId);
-    if (cachedSummary) {
-      return cachedSummary;
-    }
-
     const cached = await this.db.dashboard.get(branchId);
     return this.buildComputedDashboard(branchId, cached ?? getOfflineDemoDashboard(branchId) ?? undefined);
   }
@@ -233,7 +225,6 @@ export class WorkspaceService {
     };
 
     await this.db.dashboard.put(computedSummary);
-    this.dashboardCache.set(branchId, computedSummary);
     return computedSummary;
   }
 
@@ -370,10 +361,9 @@ export class WorkspaceService {
     deviceId: string,
   ): Promise<void> {
     try {
-      const status = await firstValueFrom(
+      await firstValueFrom(
         this.api.getSyncStatus(token, branchId, deviceId).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
       );
-      this.syncStatusCache.set(this.syncStatusKey(branchId, deviceId), status);
     } catch {
       // Keep the local sync view when the API is slow or unavailable.
     }

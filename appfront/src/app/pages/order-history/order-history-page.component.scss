@@ -1,64 +1,161 @@
 .history-page {
   display: grid;
-  gap: 18px;
+  gap: 14px;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   align-items: flex-end;
 }
 
 .page-title {
   display: grid;
-  gap: 6px;
+  gap: 4px;
 }
 
 .eyebrow {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
 }
 
 .page-header h1 {
-  margin-top: 6px;
-  font-size: 30px;
+  margin-top: 4px;
+  font-size: 26px;
+  line-height: 1.15;
 }
 
 .page-note {
   color: var(--muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .summary-note {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .page-actions {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   justify-items: end;
 }
 
 .summary-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
+}
+
+.summary-actions button {
+  padding: 9px 14px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+  border: 1px solid var(--surface-border);
+  cursor: pointer;
+}
+
+.summary-actions .secondary-button {
+  background: var(--surface-raised);
+  color: var(--text);
+}
+
+.summary-actions .primary-button {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+.summary-actions button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.tabs {
+  display: inline-flex;
+  gap: 0;
+  justify-self: start;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  overflow: hidden;
+  width: auto;
+  max-width: 100%;
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  background: transparent;
+  border: 0;
+  border-right: 1px solid var(--surface-border);
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 12px;
+  flex: 0 0 auto;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.tab-button:last-child {
+  border-right: 0;
+}
+
+.tab-button:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.tab-button.active {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.tab-button span {
+  font-size: 12px;
+}
+
+.tab-button strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 16px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted-strong);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tab-button:hover strong {
+  background: var(--surface-border);
+  color: var(--text);
+}
+
+.tab-button.active strong {
+  background: rgba(0, 0, 0, 0.10);
+  color: var(--bg);
 }
 
 .orders-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: 12px;
 }
 
 .order-card,
 .empty-card {
-  padding: 14px;
-  border-radius: var(--radius-lg);
+  padding: 12px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--surface-border);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -75,12 +172,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  background: var(--accent);
-  color: #041118;
-  font-size: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--text);
+  color: var(--bg);
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -104,16 +201,18 @@
   display: inline-flex;
   align-items: center;
   padding: 5px 8px;
-  border-radius: 8px;
-  border: 1px solid rgba(240, 178, 79, 0.28);
-  color: #f4c77c;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(229, 182, 82, 0.28);
+  color: var(--warning);
+  background: rgba(229, 182, 82, 0.10);
   font-size: 10px;
   font-weight: 600;
 }
 
 .order-badge.paid {
-  border-color: rgba(39, 194, 129, 0.24);
-  color: #8ce2bc;
+  border-color: rgba(78, 203, 133, 0.28);
+  color: var(--success);
+  background: rgba(78, 203, 133, 0.10);
 }
 
 .order-meta,
@@ -191,36 +290,38 @@
 
 .payment-row select {
   border: 1px solid var(--surface-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  background: #20252a;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  background: var(--surface-soft);
   color: var(--text);
 }
 
 .card-actions {
   display: grid;
   grid-template-columns: 0.9fr 1.2fr;
-  gap: 10px;
-  margin-top: 14px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .secondary-button,
 .primary-button {
-  border: 0;
-  border-radius: 10px;
-  padding: 12px 14px;
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
   font-weight: 600;
+  font-size: 13px;
   cursor: pointer;
 }
 
 .secondary-button {
-  background: var(--surface-soft);
+  background: var(--surface-raised);
   color: var(--text);
 }
 
 .primary-button {
-  background: var(--accent);
-  color: #041118;
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
 }
 
 .paid-button {
@@ -267,4 +368,65 @@
   .orders-grid {
     grid-template-columns: 1fr;
   }
+
+  .tabs {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .tab-button {
+    border-right: 0;
+    border-bottom: 1px solid var(--surface-border);
+    justify-content: center;
+  }
+
+  .tab-button:last-child {
+    border-bottom: 0;
+  }
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 16px 0;
+}
+
+.page-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 36px;
+  height: 36px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--surface-border);
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.page-button:hover:not(:disabled) {
+  background: var(--surface-raised);
+}
+
+.page-button.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.page-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.page-ellipsis {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 13px;
 }
