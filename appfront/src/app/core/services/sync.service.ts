@@ -29,7 +29,6 @@ export class SyncService {
       void this.runSync();
     }, Math.max(0, delayMs));
   }
-
   startBackgroundSync(): void {
     this.scheduleSync(50);
 
