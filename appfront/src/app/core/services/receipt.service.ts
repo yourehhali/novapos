@@ -56,6 +56,7 @@ export class ReceiptService {
           paperWidthMm: printer?.paperWidthMm ?? settings.receiptPaperWidthMm,
           systemPrinterName: printer?.systemPrinterName || printer?.name,
           silent: printer?.silent ?? true,
+          settings,
         });
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
         const result = await Promise.race([desktopPromise, timeout]);
@@ -94,6 +95,7 @@ export class ReceiptService {
           paperWidthMm,
           systemPrinterName: printer?.systemPrinterName || printer?.name,
           silent: printer?.silent ?? true,
+          settings,
         });
         const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
         const result = await Promise.race([desktopPromise, timeout]);

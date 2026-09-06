@@ -22,6 +22,28 @@ interface PrinterProfile {
 }
 
 type OrderChannel = 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON';
+type LogoType = 'TEXT' | 'IMAGE';
+
+interface TicketBusinessSettings {
+  businessName?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  phone?: string;
+  taxLabel?: string;
+  taxNumber?: string;
+  logoType?: LogoType;
+  logoText?: string;
+  logoImageDataUrl?: string;
+  ticketHeading?: string;
+  ticketSubheading?: string;
+  footerLine1?: string;
+  footerLine2?: string;
+  footerLine3?: string;
+  receiptPaperWidthMm?: 58 | 80;
+  kitchenPaperWidthMm?: 58 | 80;
+  currency?: string;
+  updatedAt?: string;
+}
 
 interface TicketLine {
   name: string;
@@ -56,6 +78,7 @@ interface PrintTicketRequest {
   paperWidthMm?: number;
   systemPrinterName?: string;
   silent?: boolean;
+  settings?: TicketBusinessSettings;
 }
 
 interface SalesSummaryEntry {
@@ -86,6 +109,7 @@ interface PrintSalesSummaryRequest {
   paperWidthMm?: number;
   systemPrinterName?: string;
   silent?: boolean;
+  settings?: TicketBusinessSettings;
 }
 
 type PrintOptionsWithCssPageSize = Electron.WebContentsPrintOptions & {
@@ -544,6 +568,7 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     request.printer,
     request.kind === 'KITCHEN' ? 'TICKET CUISINE' : 'TICKET PAIEMENT',
     headerMeta,
+    request.settings,
   );
   chunks.push(alignLeft());
   chunks.push(textLine('-'.repeat(width)));
@@ -561,10 +586,6 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     chunks.push(textLine(twoColumnLine('TOTAL', formatMoney(request.order.total, request.order.currency), width)));
     chunks.push(bold(false));
     chunks.push(textLine(twoColumnLine('PAIEMENT', sanitizeForEscPos(formatPaymentMethod(request.order.paymentMethod).toUpperCase()), width)));
-    chunks.push(textLine('-'.repeat(width)));
-    chunks.push(alignCenter());
-    chunks.push(textLine('Thank You!'));
-    chunks.push(alignLeft());
     chunks.push(openDrawerPulse());
   } else {
     chunks.push(textLine('ARTICLE'));
@@ -576,6 +597,16 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     }
     chunks.push(textLine('-'.repeat(width)));
     chunks.push(textLine(twoColumnLine('LIGNES', String(request.order.lineCount), width)));
+  }
+
+  const footerLines = buildFooterEscPos(request.settings, width);
+  if (footerLines.length > 0) {
+    chunks.push(textLine('-'.repeat(width)));
+    chunks.push(alignCenter());
+    for (const line of footerLines) {
+      chunks.push(textLine(line));
+    }
+    chunks.push(alignLeft());
   }
 
   chunks.push(feedLines(3));
@@ -591,9 +622,9 @@ function buildSalesSummaryEscPosPayload(request: PrintSalesSummaryRequest): Buff
 
   chunks.push(escposInit());
   appendTicketHeader(chunks, request.printer, title, [
-    request.report.branchName || BUSINESS_NAME,
+    request.report.branchName || request.settings?.businessName?.trim() || BUSINESS_NAME,
     formatDateTime(request.report.generatedAt),
-  ]);
+  ], request.settings);
   chunks.push(alignLeft());
   chunks.push(textLine('-'.repeat(width)));
   chunks.push(textLine(`DE ${sanitizeForEscPos(formatDateTime(request.report.fromAt))}`));
@@ -617,6 +648,17 @@ function buildSalesSummaryEscPosPayload(request: PrintSalesSummaryRequest): Buff
   chunks.push(bold(true));
   chunks.push(textLine(twoColumnLine('TOTAL CUMULE', formatMoney(request.report.grandTotal, request.report.currency), width)));
   chunks.push(bold(false));
+
+  const summaryFooterLines = buildFooterEscPos(request.settings, width);
+  if (summaryFooterLines.length > 0) {
+    chunks.push(textLine('-'.repeat(width)));
+    chunks.push(alignCenter());
+    for (const line of summaryFooterLines) {
+      chunks.push(textLine(line));
+    }
+    chunks.push(alignLeft());
+  }
+
   chunks.push(feedLines(3));
   chunks.push(cutPaper());
   return Buffer.concat(chunks);
@@ -754,28 +796,95 @@ function appendTicketHeader(
   printer: PrinterProfile | undefined,
   title: string,
   metaLines: string[],
+  settings: TicketBusinessSettings | undefined,
 ): void {
-  const logoChunk = buildLogoEscPosChunk(printer);
+  const width = getCharactersPerLine(printer);
+  const logoChunk = buildLogoEscPosChunk(printer, settings);
+  const businessName = settings?.businessName?.trim() || BUSINESS_NAME;
+  const heading = settings?.ticketHeading?.trim() || title;
+  const subheading = settings?.ticketSubheading?.trim();
+
   chunks.push(alignCenter());
-  if (logoChunk) {
-    chunks.push(logoChunk);
+  if (logoChunk) chunks.push(logoChunk);
+
+  if (!logoChunk || (settings?.logoType?.toUpperCase?.() !== 'IMAGE')) {
+    chunks.push(bold(true));
+    for (const line of wrapText(sanitizeForEscPos(businessName), width)) {
+      chunks.push(textLine(line));
+    }
+    chunks.push(bold(false));
   }
-  chunks.push(bold(true));
-  chunks.push(textLine(BUSINESS_NAME));
-  chunks.push(bold(false));
+
+  const businessInfoLines = buildBusinessInfoEscPos(settings, width);
+  for (const line of businessInfoLines) {
+    chunks.push(textLine(line));
+  }
+
   chunks.push(doubleHeightWidth(true));
-  chunks.push(textLine(title));
+  for (const line of wrapText(sanitizeForEscPos(heading), width)) {
+    chunks.push(textLine(line));
+  }
   chunks.push(doubleHeightWidth(false));
+  if (subheading) {
+    for (const line of wrapText(sanitizeForEscPos(subheading), width)) {
+      chunks.push(textLine(line));
+    }
+  }
+
   for (const metaLine of metaLines) {
     chunks.push(textLine(metaLine));
   }
 }
 
-function buildLogoEscPosChunk(printer: PrinterProfile | undefined): Buffer | null {
-  const logo = getTicketLogoImage();
-  if (!logo) {
-    return null;
+function buildBusinessInfoEscPos(settings: TicketBusinessSettings | undefined, width: number): string[] {
+  if (!settings) return [];
+  const lines: string[] = [];
+  const details: string[] = [];
+  if (settings.addressLine1?.trim()) details.push(settings.addressLine1.trim());
+  if (settings.addressLine2?.trim()) details.push(settings.addressLine2.trim());
+  if (settings.phone?.trim()) details.push(`Tel: ${settings.phone.trim()}`);
+  const taxLabel = settings.taxLabel?.trim();
+  const taxNumber = settings.taxNumber?.trim();
+  if (taxLabel && taxNumber) details.push(`${taxLabel}: ${taxNumber}`);
+  else if (taxNumber) details.push(taxNumber);
+  for (const raw of details) {
+    for (const line of wrapText(sanitizeForEscPos(raw), width)) {
+      lines.push(line);
+    }
   }
+  return lines;
+}
+
+function buildFooterEscPos(settings: TicketBusinessSettings | undefined, width: number): string[] {
+  if (!settings) return [];
+  const lines = [settings.footerLine1, settings.footerLine2, settings.footerLine3]
+    .map((line) => line?.trim())
+    .filter((s): s is string => Boolean(s));
+  if (lines.length === 0) return [];
+  const wrapped: string[] = [];
+  for (const raw of lines) {
+    for (const line of wrapText(sanitizeForEscPos(raw), width)) {
+      wrapped.push(line);
+    }
+  }
+  return wrapped;
+}
+
+function buildLogoEscPosChunk(
+  printer: PrinterProfile | undefined,
+  settings: TicketBusinessSettings | undefined,
+): Buffer | null {
+  let logo: Electron.NativeImage | null = null;
+
+  if (settings?.logoType?.toUpperCase?.() === 'IMAGE' && settings.logoImageDataUrl?.trim()) {
+    try {
+      const fromData = nativeImage.createFromDataURL(settings.logoImageDataUrl.trim());
+      if (fromData && !fromData.isEmpty()) logo = fromData;
+    } catch { /* ignore invalid data url, fall back */ }
+  }
+
+  if (!logo) logo = getTicketLogoImage();
+  if (!logo) return null;
 
   const paperWidthMm = printer?.paperWidthMm ?? 80;
   const maxWidthDots = paperWidthMm <= 58 ? 200 : 280;

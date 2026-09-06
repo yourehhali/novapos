@@ -269,6 +269,7 @@ export interface PrintTicketRequest {
   paperWidthMm?: number;
   systemPrinterName?: string;
   silent?: boolean;
+  settings?: BusinessSettings;
 }
 
 export interface PrintSalesSummaryRequest {
@@ -278,6 +279,7 @@ export interface PrintSalesSummaryRequest {
   paperWidthMm?: number;
   systemPrinterName?: string;
   silent?: boolean;
+  settings?: BusinessSettings;
 }
 
 export interface PrintTicketResult {
