@@ -12,7 +12,7 @@ import {
 } from '../models/app.models';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { AppModalService } from './app-modal.service';
-import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS } from './business-settings.service';
+import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS, mergeTicketLayoutConfig } from './business-settings.service';
 import { DesktopBridgeService } from './desktop-bridge.service';
 
 type TicketKind = PrintTicketRequest['kind'];
@@ -281,10 +281,12 @@ export class ReceiptService {
         <div class="summary-row meta-row"><span>Lignes</span><span>${order.lineCount}</span></div>
       `;
 
-    const logoBlock = this.renderLogo(settings);
-    const heading = this.renderHeading(settings, kind);
-    const businessBlock = this.renderBusinessInfo(settings);
-    const footer = this.renderFooter(settings);
+    const kindKey: 'payment' | 'kitchen' = kind === 'KITCHEN' ? 'kitchen' : 'payment';
+    const layout = mergeTicketLayoutConfig(settings, kindKey);
+    const logoBlock = this.renderLogo(settings, kindKey);
+    const heading = this.renderHeading(settings, kindKey);
+    const businessBlock = layout.showBusinessInfo ? this.renderBusinessInfo(settings) : '';
+    const footer = this.renderFooter(settings, kindKey);
     const channelLines = this.formatChannel(order, drivers);
 
     return `
@@ -362,9 +364,10 @@ export class ReceiptService {
         `).join('')
       : `<tr><td class="time">--:--</td><td class="item">Aucune commande payee</td><td class="price">${this.formatMoney(0, request.report.currency)}</td></tr>`;
 
-    const logoBlock = this.renderLogo(settings);
-    const businessBlock = this.renderBusinessInfo(settings);
-    const footer = this.renderFooter(settings);
+    const summaryLayout = mergeTicketLayoutConfig(settings, 'payment');
+    const logoBlock = this.renderLogo(settings, 'payment');
+    const businessBlock = summaryLayout.showBusinessInfo ? this.renderBusinessInfo(settings) : '';
+    const footer = this.renderFooter(settings, 'payment');
 
     return `
       <!doctype html>
@@ -455,17 +458,22 @@ export class ReceiptService {
     return Math.max(80, Math.min(380, Math.ceil(heightMm)));
   }
 
-  private renderLogo(settings: BusinessSettings): string {
-    if (settings.logoType === ('IMAGE' as LogoType) && settings.logoImageDataUrl?.trim()) {
-      return `<div class="logo"><img class="logo-img" src="${this.escapeAttr(settings.logoImageDataUrl.trim())}" alt="" /></div>`;
+  private renderLogo(settings: BusinessSettings, kind: 'payment' | 'kitchen'): string {
+    const layout = mergeTicketLayoutConfig(settings, kind);
+    if (layout.logoType === ('IMAGE' as LogoType) && layout.logoImageDataUrl?.trim()) {
+      return `<div class="logo"><img class="logo-img" src="${this.escapeAttr(layout.logoImageDataUrl.trim())}" alt="" /></div>`;
     }
-    const text = (settings.logoText?.trim() || settings.businessName?.trim() || 'HM').slice(0, 14);
+    const text = (layout.logoText?.trim() || settings.logoText?.trim() || settings.businessName?.trim() || 'HM').slice(0, 14);
+    if (!text && !(layout.logoType === ('IMAGE' as LogoType) && layout.logoImageDataUrl?.trim())) {
+      return '';
+    }
     return `<div class="logo"><span class="logo-text">${this.escapeHtml(text)}</span></div>`;
   }
 
-  private renderHeading(settings: BusinessSettings, _kind: TicketKind): string {
-    const heading = settings.ticketHeading?.trim();
-    const subheading = settings.ticketSubheading?.trim();
+  private renderHeading(settings: BusinessSettings, kind: 'payment' | 'kitchen'): string {
+    const layout = mergeTicketLayoutConfig(settings, kind);
+    const heading = layout.heading?.trim();
+    const subheading = layout.subheading?.trim();
     if (!heading && !subheading) return '';
     return [
       heading ? `<h1 class="ticket-title">${this.escapeHtml(heading)}</h1>` : '',
@@ -493,8 +501,9 @@ export class ReceiptService {
     return lines.join('');
   }
 
-  private renderFooter(settings: BusinessSettings): string {
-    const lines = [settings.footerLine1, settings.footerLine2, settings.footerLine3]
+  private renderFooter(settings: BusinessSettings, kind: 'payment' | 'kitchen'): string {
+    const layout = mergeTicketLayoutConfig(settings, kind);
+    const lines = [layout.footerLine1, layout.footerLine2, layout.footerLine3]
       .map((line) => line?.trim())
       .filter(Boolean) as string[];
     if (lines.length === 0) return '';

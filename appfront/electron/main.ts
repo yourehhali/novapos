@@ -24,6 +24,30 @@ interface PrinterProfile {
 type OrderChannel = 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON';
 type LogoType = 'TEXT' | 'IMAGE';
 
+interface TicketLayoutOverride {
+  showBusinessInfo?: boolean;
+  logoType?: LogoType;
+  logoText?: string;
+  logoImageDataUrl?: string;
+  heading?: string;
+  subheading?: string;
+  footerLine1?: string;
+  footerLine2?: string;
+  footerLine3?: string;
+}
+
+interface ResolvedTicketLayout {
+  showBusinessInfo: boolean;
+  logoType: LogoType;
+  logoText: string;
+  logoImageDataUrl: string;
+  heading: string;
+  subheading: string;
+  footerLine1: string;
+  footerLine2: string;
+  footerLine3: string;
+}
+
 interface TicketBusinessSettings {
   businessName?: string;
   addressLine1?: string;
@@ -39,10 +63,80 @@ interface TicketBusinessSettings {
   footerLine1?: string;
   footerLine2?: string;
   footerLine3?: string;
+  paymentTicket?: TicketLayoutOverride | null;
+  kitchenTicket?: TicketLayoutOverride | null;
   receiptPaperWidthMm?: 58 | 80;
   kitchenPaperWidthMm?: 58 | 80;
   currency?: string;
   updatedAt?: string;
+}
+
+const DEFAULT_RESOLVED_LAYOUTS: Record<'payment' | 'kitchen', ResolvedTicketLayout> = {
+  payment: {
+    showBusinessInfo: true,
+    logoType: 'TEXT',
+    logoText: '',
+    logoImageDataUrl: '',
+    heading: 'Ticket Commande',
+    subheading: '',
+    footerLine1: 'Merci pour votre visite',
+    footerLine2: 'A bientot',
+    footerLine3: '',
+  },
+  kitchen: {
+    showBusinessInfo: false,
+    logoType: 'TEXT',
+    logoText: '',
+    logoImageDataUrl: '',
+    heading: 'Ticket Cuisine',
+    subheading: '',
+    footerLine1: '',
+    footerLine2: '',
+    footerLine3: '',
+  },
+};
+
+function resolveTicketLayout(
+  settings: TicketBusinessSettings | undefined,
+  kind: 'payment' | 'kitchen',
+): ResolvedTicketLayout {
+  const fallback = DEFAULT_RESOLVED_LAYOUTS[kind];
+  if (!settings) return fallback;
+  const override = kind === 'kitchen' ? settings.kitchenTicket : settings.paymentTicket;
+  const topFallback: ResolvedTicketLayout = kind === 'kitchen'
+    ? {
+        showBusinessInfo: false,
+        logoType: (settings.logoType ?? fallback.logoType) as LogoType,
+        logoText: settings.logoText ?? fallback.logoText,
+        logoImageDataUrl: settings.logoImageDataUrl ?? fallback.logoImageDataUrl,
+        heading: fallback.heading,
+        subheading: '',
+        footerLine1: '',
+        footerLine2: '',
+        footerLine3: '',
+      }
+    : {
+        showBusinessInfo: true,
+        logoType: (settings.logoType ?? fallback.logoType) as LogoType,
+        logoText: settings.logoText ?? fallback.logoText,
+        logoImageDataUrl: settings.logoImageDataUrl ?? fallback.logoImageDataUrl,
+        heading: settings.ticketHeading ?? fallback.heading,
+        subheading: settings.ticketSubheading ?? fallback.subheading,
+        footerLine1: settings.footerLine1 ?? fallback.footerLine1,
+        footerLine2: settings.footerLine2 ?? fallback.footerLine2,
+        footerLine3: settings.footerLine3 ?? fallback.footerLine3,
+      };
+  return {
+    showBusinessInfo: override?.showBusinessInfo ?? topFallback.showBusinessInfo,
+    logoType: ((override?.logoType ?? topFallback.logoType) || 'TEXT') as LogoType,
+    logoText: override?.logoText ?? topFallback.logoText,
+    logoImageDataUrl: override?.logoImageDataUrl ?? topFallback.logoImageDataUrl,
+    heading: override?.heading ?? topFallback.heading,
+    subheading: override?.subheading ?? topFallback.subheading,
+    footerLine1: override?.footerLine1 ?? topFallback.footerLine1,
+    footerLine2: override?.footerLine2 ?? topFallback.footerLine2,
+    footerLine3: override?.footerLine3 ?? topFallback.footerLine3,
+  };
 }
 
 interface TicketLine {
@@ -566,6 +660,7 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
   appendTicketHeader(
     chunks,
     request.printer,
+    request.kind === 'KITCHEN' ? 'kitchen' : 'payment',
     request.kind === 'KITCHEN' ? 'TICKET CUISINE' : 'TICKET PAIEMENT',
     headerMeta,
     request.settings,
@@ -599,7 +694,11 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     chunks.push(textLine(twoColumnLine('LIGNES', String(request.order.lineCount), width)));
   }
 
-  const footerLines = buildFooterEscPos(request.settings, width);
+  const footerLines = buildFooterEscPos(
+    request.settings,
+    request.kind === 'KITCHEN' ? 'kitchen' : 'payment',
+    width,
+  );
   if (footerLines.length > 0) {
     chunks.push(textLine('-'.repeat(width)));
     chunks.push(alignCenter());
@@ -621,7 +720,7 @@ function buildSalesSummaryEscPosPayload(request: PrintSalesSummaryRequest): Buff
     request.report.range === 'DAY_START' ? 'TOTAL DEBUT JOURNEE' : 'TOTAL DEPUIS DERNIER';
 
   chunks.push(escposInit());
-  appendTicketHeader(chunks, request.printer, title, [
+  appendTicketHeader(chunks, request.printer, 'payment', title, [
     request.report.branchName || request.settings?.businessName?.trim() || BUSINESS_NAME,
     formatDateTime(request.report.generatedAt),
   ], request.settings);
@@ -649,7 +748,7 @@ function buildSalesSummaryEscPosPayload(request: PrintSalesSummaryRequest): Buff
   chunks.push(textLine(twoColumnLine('TOTAL CUMULE', formatMoney(request.report.grandTotal, request.report.currency), width)));
   chunks.push(bold(false));
 
-  const summaryFooterLines = buildFooterEscPos(request.settings, width);
+  const summaryFooterLines = buildFooterEscPos(request.settings, 'payment', width);
   if (summaryFooterLines.length > 0) {
     chunks.push(textLine('-'.repeat(width)));
     chunks.push(alignCenter());
@@ -794,30 +893,37 @@ function centerText(value: string, width: number): string {
 function appendTicketHeader(
   chunks: Buffer[],
   printer: PrinterProfile | undefined,
+  kind: 'payment' | 'kitchen',
   title: string,
   metaLines: string[],
   settings: TicketBusinessSettings | undefined,
 ): void {
   const width = getCharactersPerLine(printer);
-  const logoChunk = buildLogoEscPosChunk(printer, settings);
+  const layout = resolveTicketLayout(settings, kind);
   const businessName = settings?.businessName?.trim() || BUSINESS_NAME;
-  const heading = settings?.ticketHeading?.trim() || title;
-  const subheading = settings?.ticketSubheading?.trim();
+  const heading = layout.heading?.trim() || title;
+  const subheading = layout.subheading?.trim();
 
   chunks.push(alignCenter());
+  const logoChunk = buildLogoEscPosChunk(printer, layout);
   if (logoChunk) chunks.push(logoChunk);
 
-  if (!logoChunk || (settings?.logoType?.toUpperCase?.() !== 'IMAGE')) {
+  if (!logoChunk || layout.logoType !== 'IMAGE') {
+    const logoTextSource = layout.logoType === 'TEXT' && layout.logoText?.trim()
+      ? layout.logoText.trim()
+      : layout.logoText?.trim() || businessName;
     chunks.push(bold(true));
-    for (const line of wrapText(sanitizeForEscPos(businessName), width)) {
+    for (const line of wrapText(sanitizeForEscPos(logoTextSource), width)) {
       chunks.push(textLine(line));
     }
     chunks.push(bold(false));
   }
 
-  const businessInfoLines = buildBusinessInfoEscPos(settings, width);
-  for (const line of businessInfoLines) {
-    chunks.push(textLine(line));
+  if (layout.showBusinessInfo) {
+    const businessInfoLines = buildBusinessInfoEscPos(settings, width);
+    for (const line of businessInfoLines) {
+      chunks.push(textLine(line));
+    }
   }
 
   chunks.push(doubleHeightWidth(true));
@@ -855,9 +961,9 @@ function buildBusinessInfoEscPos(settings: TicketBusinessSettings | undefined, w
   return lines;
 }
 
-function buildFooterEscPos(settings: TicketBusinessSettings | undefined, width: number): string[] {
-  if (!settings) return [];
-  const lines = [settings.footerLine1, settings.footerLine2, settings.footerLine3]
+function buildFooterEscPos(settings: TicketBusinessSettings | undefined, kind: 'payment' | 'kitchen', width: number): string[] {
+  const layout = resolveTicketLayout(settings, kind);
+  const lines = [layout.footerLine1, layout.footerLine2, layout.footerLine3]
     .map((line) => line?.trim())
     .filter((s): s is string => Boolean(s));
   if (lines.length === 0) return [];
@@ -872,13 +978,13 @@ function buildFooterEscPos(settings: TicketBusinessSettings | undefined, width: 
 
 function buildLogoEscPosChunk(
   printer: PrinterProfile | undefined,
-  settings: TicketBusinessSettings | undefined,
+  layout: ResolvedTicketLayout,
 ): Buffer | null {
   let logo: Electron.NativeImage | null = null;
 
-  if (settings?.logoType?.toUpperCase?.() === 'IMAGE' && settings.logoImageDataUrl?.trim()) {
+  if (layout.logoType === 'IMAGE' && layout.logoImageDataUrl?.trim()) {
     try {
-      const fromData = nativeImage.createFromDataURL(settings.logoImageDataUrl.trim());
+      const fromData = nativeImage.createFromDataURL(layout.logoImageDataUrl.trim());
       if (fromData && !fromData.isEmpty()) logo = fromData;
     } catch { /* ignore invalid data url, fall back */ }
   }

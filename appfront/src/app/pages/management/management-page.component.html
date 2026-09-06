@@ -568,9 +568,55 @@
         </div>
       </div>
 
-      <!-- Logo block -->
+      <!-- Default block -->
       <div class="settings-block">
-        <p class="block-title">Logo du tiquet</p>
+        <p class="block-title">Parametres par defaut (fallback)</p>
+        <p class="block-subtitle">Valeurs globales utilisees si un type de ticket n a pas ses propres parametres.</p>
+        <div class="form-grid">
+          <label>
+            <span>Titre par defaut (ticket paiement)</span>
+            <input
+              type="text"
+              [ngModel]="s.ticketHeading"
+              (ngModelChange)="setSettingsField('ticketHeading', $event)"
+              placeholder="Ex: Ticket Commande"
+            />
+          </label>
+          <label>
+            <span>Sous-titre par defaut</span>
+            <input
+              type="text"
+              [ngModel]="s.ticketSubheading"
+              (ngModelChange)="setSettingsField('ticketSubheading', $event)"
+              placeholder="Optionnel - sous le titre"
+            />
+          </label>
+          <label>
+            <span>Pied page 1 par defaut</span>
+            <input
+              type="text"
+              [ngModel]="s.footerLine1"
+              (ngModelChange)="setSettingsField('footerLine1', $event)"
+            />
+          </label>
+          <label>
+            <span>Pied page 2 par defaut</span>
+            <input
+              type="text"
+              [ngModel]="s.footerLine2"
+              (ngModelChange)="setSettingsField('footerLine2', $event)"
+            />
+          </label>
+          <label style="grid-column: 1 / -1;">
+            <span>Pied page 3 par defaut</span>
+            <input
+              type="text"
+              [ngModel]="s.footerLine3"
+              (ngModelChange)="setSettingsField('footerLine3', $event)"
+            />
+          </label>
+        </div>
+        <p class="logo-subtitle mt">Logo par defaut:</p>
         <div class="logo-type-row">
           <label class="radio-pill">
             <input
@@ -593,11 +639,10 @@
             <span>Image</span>
           </label>
         </div>
-
         <div class="logo-config" *ngIf="s.logoType === 'TEXT'">
           <div class="form-grid">
             <label style="grid-column: 1 / -1;">
-              <span>Texte du logo (court, 4-14 caracteres recommandes)</span>
+              <span>Texte du logo par defaut (court, 4-14 caracteres recommandes)</span>
               <input
                 type="text"
                 maxlength="14"
@@ -611,7 +656,6 @@
             <span class="logo-text-preview">{{ s.logoText?.trim() || s.businessName?.slice(0,14) || 'HM' }}</span>
           </div>
         </div>
-
         <div class="logo-config" *ngIf="s.logoType === 'IMAGE'">
           <div class="form-grid">
             <label>
@@ -645,56 +689,279 @@
         </div>
       </div>
 
-      <!-- Ticket text block -->
+      <!-- Per-kind ticket layouts -->
       <div class="settings-block">
-        <p class="block-title">Textes du tiquet</p>
-        <div class="form-grid">
-          <label>
-            <span>Titre du tiquet</span>
-            <input
-              type="text"
-              [ngModel]="s.ticketHeading"
-              (ngModelChange)="setSettingsField('ticketHeading', $event)"
-              placeholder="Ex: Ticket Commande"
-            />
-          </label>
-          <label>
-            <span>Sous-titre du tiquet</span>
-            <input
-              type="text"
-              [ngModel]="s.ticketSubheading"
-              (ngModelChange)="setSettingsField('ticketSubheading', $event)"
-              placeholder="Optionnel - sous le titre"
-            />
-          </label>
-          <label>
-            <span>Ligne pied de page 1</span>
-            <input
-              type="text"
-              [ngModel]="s.footerLine1"
-              (ngModelChange)="setSettingsField('footerLine1', $event)"
-              placeholder="Ex: Merci pour votre visite"
-            />
-          </label>
-          <label>
-            <span>Ligne pied de page 2</span>
-            <input
-              type="text"
-              [ngModel]="s.footerLine2"
-              (ngModelChange)="setSettingsField('footerLine2', $event)"
-              placeholder="Ex: A bientot"
-            />
-          </label>
-          <label style="grid-column: 1 / -1;">
-            <span>Ligne pied de page 3</span>
-            <input
-              type="text"
-              [ngModel]="s.footerLine3"
-              (ngModelChange)="setSettingsField('footerLine3', $event)"
-              placeholder="Optionnel"
-            />
-          </label>
+        <p class="block-title">Mise en page par type de ticket</p>
+        <div class="tab-row">
+          <button
+            type="button"
+            class="tab-chip"
+            [class.active]="settingsTicketTab() === 'payment'"
+            (click)="setSettingsTicketTab('payment')"
+          >
+            Ticket paiement
+          </button>
+          <button
+            type="button"
+            class="tab-chip"
+            [class.active]="settingsTicketTab() === 'kitchen'"
+            (click)="setSettingsTicketTab('kitchen')"
+          >
+            Ticket cuisine
+          </button>
         </div>
+
+        <ng-container *ngIf="settingsTicketTab() === 'payment' && getTicketLayout('payment') as p">
+          <div class="ticket-layout-header">
+            <label class="toggle-row">
+              <input
+                type="checkbox"
+                [checked]="p.showBusinessInfo"
+                (change)="setTicketLayoutField('payment', 'showBusinessInfo', $event.target.checked)"
+              />
+              <span>Afficher le bloc entreprise (nom / adresse / tel / taxe)</span>
+            </label>
+          </div>
+          <div class="logo-type-row">
+            <label class="radio-pill">
+              <input
+                type="radio"
+                name="logoTypePayment"
+                value="TEXT"
+                [checked]="p.logoType === 'TEXT'"
+                (change)="setTicketLayoutLogoType('payment', 'TEXT')"
+              />
+              <span>Texte</span>
+            </label>
+            <label class="radio-pill">
+              <input
+                type="radio"
+                name="logoTypePayment"
+                value="IMAGE"
+                [checked]="p.logoType === 'IMAGE'"
+                (change)="setTicketLayoutLogoType('payment', 'IMAGE')"
+              />
+              <span>Image</span>
+            </label>
+          </div>
+          <div class="logo-config" *ngIf="p.logoType === 'TEXT'">
+            <div class="form-grid">
+              <label style="grid-column: 1 / -1;">
+                <span>Logo texte (4-14 caracteres). Laissez vide pour utiliser le logo par defaut.</span>
+                <input
+                  type="text"
+                  maxlength="14"
+                  [ngModel]="p.logoText"
+                  (ngModelChange)="setTicketLayoutField('payment', 'logoText', $event)"
+                  placeholder="Ex: HOLE MOLE"
+                />
+              </label>
+            </div>
+            <div class="logo-preview ticket-preview">
+              <span class="logo-text-preview">{{ p.logoText?.trim() || s.logoText?.trim() || s.businessName?.slice(0,14) || 'HM' }}</span>
+            </div>
+          </div>
+          <div class="logo-config" *ngIf="p.logoType === 'IMAGE'">
+            <div class="form-grid">
+              <label>
+                <span>Image logo paiement (PNG/JPG max 1.5 Mo). Laissez vide pour utiliser le logo par defaut.</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  (change)="handleTicketLayoutLogoImageFile('payment', $event)"
+                />
+              </label>
+            </div>
+            <div class="logo-preview ticket-preview">
+              <img
+                *ngIf="p.logoImageDataUrl"
+                class="logo-image-preview"
+                [src]="p.logoImageDataUrl"
+                alt="logo paiement preview"
+              />
+              <div *ngIf="!p.logoImageDataUrl" class="logo-preview-empty">
+                Aucune image (utilisera le logo par defaut)
+              </div>
+            </div>
+            <button
+              type="button"
+              class="secondary-button"
+              *ngIf="p.logoImageDataUrl"
+              (click)="clearTicketLayoutLogoImage('payment')"
+            >
+              Supprimer l image
+            </button>
+          </div>
+          <div class="form-grid mt">
+            <label>
+              <span>Titre du ticket paiement</span>
+              <input
+                type="text"
+                [ngModel]="p.heading"
+                (ngModelChange)="setTicketLayoutField('payment', 'heading', $event)"
+                placeholder="Ex: Ticket Commande"
+              />
+            </label>
+            <label>
+              <span>Sous-titre du ticket paiement</span>
+              <input
+                type="text"
+                [ngModel]="p.subheading"
+                (ngModelChange)="setTicketLayoutField('payment', 'subheading', $event)"
+              />
+            </label>
+            <label>
+              <span>Pied de page 1</span>
+              <input
+                type="text"
+                [ngModel]="p.footerLine1"
+                (ngModelChange)="setTicketLayoutField('payment', 'footerLine1', $event)"
+              />
+            </label>
+            <label>
+              <span>Pied de page 2</span>
+              <input
+                type="text"
+                [ngModel]="p.footerLine2"
+                (ngModelChange)="setTicketLayoutField('payment', 'footerLine2', $event)"
+              />
+            </label>
+            <label style="grid-column: 1 / -1;">
+              <span>Pied de page 3</span>
+              <input
+                type="text"
+                [ngModel]="p.footerLine3"
+                (ngModelChange)="setTicketLayoutField('payment', 'footerLine3', $event)"
+              />
+            </label>
+          </div>
+        </ng-container>
+
+        <ng-container *ngIf="settingsTicketTab() === 'kitchen' && getTicketLayout('kitchen') as k">
+          <div class="ticket-layout-header">
+            <label class="toggle-row">
+              <input
+                type="checkbox"
+                [checked]="k.showBusinessInfo"
+                (change)="setTicketLayoutField('kitchen', 'showBusinessInfo', $event.target.checked)"
+              />
+              <span>Afficher le bloc entreprise (nom / adresse / tel / taxe)</span>
+            </label>
+          </div>
+          <div class="logo-type-row">
+            <label class="radio-pill">
+              <input
+                type="radio"
+                name="logoTypeKitchen"
+                value="TEXT"
+                [checked]="k.logoType === 'TEXT'"
+                (change)="setTicketLayoutLogoType('kitchen', 'TEXT')"
+              />
+              <span>Texte</span>
+            </label>
+            <label class="radio-pill">
+              <input
+                type="radio"
+                name="logoTypeKitchen"
+                value="IMAGE"
+                [checked]="k.logoType === 'IMAGE'"
+                (change)="setTicketLayoutLogoType('kitchen', 'IMAGE')"
+              />
+              <span>Image</span>
+            </label>
+          </div>
+          <div class="logo-config" *ngIf="k.logoType === 'TEXT'">
+            <div class="form-grid">
+              <label style="grid-column: 1 / -1;">
+                <span>Logo texte cuisine (4-14 caracteres). Laissez vide = pas de logo texte / defaut.</span>
+                <input
+                  type="text"
+                  maxlength="14"
+                  [ngModel]="k.logoText"
+                  (ngModelChange)="setTicketLayoutField('kitchen', 'logoText', $event)"
+                  placeholder="Ex: CUISINE"
+                />
+              </label>
+            </div>
+            <div class="logo-preview ticket-preview">
+              <span class="logo-text-preview">{{ k.logoText?.trim() || s.businessName?.slice(0,14) || 'KOT' }}</span>
+            </div>
+          </div>
+          <div class="logo-config" *ngIf="k.logoType === 'IMAGE'">
+            <div class="form-grid">
+              <label>
+                <span>Image logo cuisine (PNG/JPG max 1.5 Mo). Laissez vide pour le logo par defaut.</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  (change)="handleTicketLayoutLogoImageFile('kitchen', $event)"
+                />
+              </label>
+            </div>
+            <div class="logo-preview ticket-preview">
+              <img
+                *ngIf="k.logoImageDataUrl"
+                class="logo-image-preview"
+                [src]="k.logoImageDataUrl"
+                alt="logo cuisine preview"
+              />
+              <div *ngIf="!k.logoImageDataUrl" class="logo-preview-empty">
+                Aucune image (logo par defaut)
+              </div>
+            </div>
+            <button
+              type="button"
+              class="secondary-button"
+              *ngIf="k.logoImageDataUrl"
+              (click)="clearTicketLayoutLogoImage('kitchen')"
+            >
+              Supprimer l image
+            </button>
+          </div>
+          <div class="form-grid mt">
+            <label>
+              <span>Titre du ticket cuisine</span>
+              <input
+                type="text"
+                [ngModel]="k.heading"
+                (ngModelChange)="setTicketLayoutField('kitchen', 'heading', $event)"
+                placeholder="Ex: Ticket Cuisine"
+              />
+            </label>
+            <label>
+              <span>Sous-titre du ticket cuisine</span>
+              <input
+                type="text"
+                [ngModel]="k.subheading"
+                (ngModelChange)="setTicketLayoutField('kitchen', 'subheading', $event)"
+              />
+            </label>
+            <label>
+              <span>Pied de page 1</span>
+              <input
+                type="text"
+                [ngModel]="k.footerLine1"
+                (ngModelChange)="setTicketLayoutField('kitchen', 'footerLine1', $event)"
+              />
+            </label>
+            <label>
+              <span>Pied de page 2</span>
+              <input
+                type="text"
+                [ngModel]="k.footerLine2"
+                (ngModelChange)="setTicketLayoutField('kitchen', 'footerLine2', $event)"
+              />
+            </label>
+            <label style="grid-column: 1 / -1;">
+              <span>Pied de page 3</span>
+              <input
+                type="text"
+                [ngModel]="k.footerLine3"
+                (ngModelChange)="setTicketLayoutField('kitchen', 'footerLine3', $event)"
+              />
+            </label>
+          </div>
+        </ng-container>
       </div>
 
       <!-- Printers block -->

@@ -217,6 +217,18 @@ export interface ReportPrintState {
 
 export type LogoType = 'TEXT' | 'IMAGE';
 
+export interface TicketLayoutConfig {
+  showBusinessInfo: boolean;
+  logoType: LogoType;
+  logoText: string;
+  logoImageDataUrl: string;
+  heading: string;
+  subheading: string;
+  footerLine1: string;
+  footerLine2: string;
+  footerLine3: string;
+}
+
 export interface BusinessSettings {
   id: 'current';
   businessName: string;
@@ -233,6 +245,8 @@ export interface BusinessSettings {
   footerLine1: string;
   footerLine2: string;
   footerLine3: string;
+  paymentTicket?: TicketLayoutConfig | null;
+  kitchenTicket?: TicketLayoutConfig | null;
   receiptPrinterName: string;
   receiptQueueName: string;
   receiptPrinterIp: string;

@@ -1,7 +1,16 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BusinessSettings, Category, DeliveryDriver, FloorTable, LogoType, Product, ResourceStatus } from '../../core/models/app.models';
+import {
+  BusinessSettings,
+  Category,
+  DeliveryDriver,
+  FloorTable,
+  LogoType,
+  Product,
+  ResourceStatus,
+  TicketLayoutConfig,
+} from '../../core/models/app.models';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
 import { ReceiptService } from '../../core/services/receipt.service';
@@ -11,6 +20,7 @@ const PIN_STORAGE_KEY = 'novapos.management.pin.authed';
 const MANAGEMENT_PIN = '281998';
 
 type MgmtTab = 'categories' | 'products' | 'settings' | 'tables' | 'drivers';
+type SettingsTicketKind = 'payment' | 'kitchen';
 
 @Component({
   selector: 'app-management-page',
@@ -45,6 +55,7 @@ export class ManagementPageComponent implements OnInit {
   protected readonly editingSettings = signal<BusinessSettings | null>(null);
   protected readonly saveSettingsError = signal<string | null>(null);
   protected readonly saveSettingsSuccess = signal<string | null>(null);
+  protected readonly settingsTicketTab = signal<SettingsTicketKind>('payment');
 
   protected filteredProducts = computed(() => {
     const q = this.productSearch().trim().toLowerCase();
@@ -436,6 +447,67 @@ export class ManagementPageComponent implements OnInit {
   setSettingsKitchenWidth(value: string | number): void {
     const n = Number(value);
     this.setSettingsField('kitchenPaperWidthMm', n === 58 ? 58 : 80);
+  }
+
+  setSettingsTicketTab(kind: SettingsTicketKind): void {
+    this.settingsTicketTab.set(kind);
+  }
+
+  getTicketLayout(kind: SettingsTicketKind): TicketLayoutConfig | null {
+    const s = this.editingSettings();
+    if (!s) return null;
+    return kind === 'payment' ? (s.paymentTicket ?? null) : (s.kitchenTicket ?? null);
+  }
+
+  setTicketLayoutField<K extends keyof TicketLayoutConfig>(
+    kind: SettingsTicketKind,
+    field: K,
+    value: TicketLayoutConfig[K],
+  ): void {
+    const s = this.editingSettings();
+    if (!s) return;
+    const key = kind === 'payment' ? 'paymentTicket' : 'kitchenTicket';
+    const existing = (s[key] ?? {}) as TicketLayoutConfig;
+    const merged: TicketLayoutConfig = { ...existing, [field]: value } as TicketLayoutConfig;
+    this.editingSettings.set({ ...s, [key]: merged });
+  }
+
+  setTicketLayoutLogoType(kind: SettingsTicketKind, value: string): void {
+    const v = (value ?? 'TEXT') as LogoType;
+    this.setTicketLayoutField(kind, 'logoType', v);
+  }
+
+  async handleTicketLayoutLogoImageFile(kind: SettingsTicketKind, event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      this.saveSettingsError.set('Le logo doit etre une image (PNG, JPG, etc).');
+      return;
+    }
+    if (file.size > 1_500_000) {
+      this.saveSettingsError.set('L image du logo est trop volumineuse (max 1.5 Mo).');
+      return;
+    }
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error ?? new Error('Echec lecture image'));
+        reader.readAsDataURL(file);
+      });
+      this.setTicketLayoutField(kind, 'logoImageDataUrl', dataUrl);
+      this.setTicketLayoutField(kind, 'logoType', 'IMAGE' as LogoType);
+      this.saveSettingsError.set(null);
+    } catch (err: unknown) {
+      this.saveSettingsError.set(`Echec lecture image : ${(err as Error)?.message ?? String(err)}`);
+    } finally {
+      input.value = '';
+    }
+  }
+
+  clearTicketLayoutLogoImage(kind: SettingsTicketKind): void {
+    this.setTicketLayoutField(kind, 'logoImageDataUrl', '');
   }
 
   async handleLogoImageFile(event: Event): Promise<void> {
