@@ -551,6 +551,187 @@
   accent-color: var(--accent);
 }
 
+.danger-settings-block {
+  margin-top: 18px;
+  padding: 16px;
+  background: color-mix(in srgb, #ff3b30 6%, var(--surface-raised));
+  border: 1px solid color-mix(in srgb, #ff3b30 30%, var(--surface-border));
+  border-radius: var(--radius-md);
+}
+
+.danger-subtitle {
+  color: #ff9b8e;
+}
+
+.reset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.form-card.success-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, #32d74b 10%, var(--surface-raised));
+  border: 1px solid color-mix(in srgb, #32d74b 36%, var(--surface-border));
+  color: color-mix(in srgb, #32d74b 94%, var(--text));
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+}
+
+.form-card.error-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, #ff3b30 10%, var(--surface-raised));
+  border: 1px solid color-mix(in srgb, #ff3b30 36%, var(--surface-border));
+  color: #ff9b8e;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+}
+
+/* -------- Modal reinitialisation -------- */
+
+.modal-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 9, 0.72);
+  backdrop-filter: blur(2px);
+}
+
+.modal-shell {
+  position: relative;
+  z-index: 1;
+  width: min(540px, 100%);
+  max-height: calc(100vh - 48px);
+  background: var(--surface);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  display: grid;
+}
+
+.modal-shell-header,
+.modal-shell-body,
+.modal-shell-footer {
+  padding: 16px 20px;
+}
+
+.modal-shell-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--surface-border);
+}
+
+.modal-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.modal-title-mode {
+  color: var(--muted);
+  font-weight: 500;
+  margin-left: 6px;
+}
+
+.modal-close {
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.modal-close:hover {
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+.modal-shell-body {
+  display: grid;
+  gap: 12px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.modal-shell-footer {
+  border-top: 1px solid var(--surface-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.danger-lead {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.danger-lead strong {
+  color: #ff9b8e;
+}
+
+.modal-shell-body .muted {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+}
+
+.pin-field {
+  display: grid;
+  gap: 6px;
+}
+
+.pin-field > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted-strong);
+}
+
+.pin-field input {
+  width: 100%;
+  max-width: 320px;
+  padding: 10px 12px;
+  background: var(--surface-raised);
+  color: var(--text);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  outline: none;
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+}
+
+.pin-field input:focus {
+  border-color: var(--accent);
+  background: var(--surface-raised);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.pin-field input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .form-success {
   padding: 8px 10px;
   border-radius: var(--radius-sm);

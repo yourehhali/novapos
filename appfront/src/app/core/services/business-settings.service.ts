@@ -1,5 +1,5 @@
-import { Injectable, inject } from '@angular/core';
-import { BusinessSettings, LogoType, TicketLayoutConfig } from '../models/app.models';
+import { Injectable, inject, signal } from '@angular/core';
+import { BusinessSettings, DemoSeedingMode, LogoType, TicketLayoutConfig } from '../models/app.models';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 
 export function defaultTicketLayoutConfig(kind: 'payment' | 'kitchen'): TicketLayoutConfig {
@@ -90,6 +90,7 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   footerLine3: '',
   paymentTicket: defaultTicketLayoutConfig('payment'),
   kitchenTicket: defaultTicketLayoutConfig('kitchen'),
+  demoSeedingMode: 'DEMO' as DemoSeedingMode,
   receiptPrinterName: 'Impression navigateur',
   receiptQueueName: 'default-receipt',
   receiptPrinterIp: '',
@@ -102,32 +103,42 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   updatedAt: new Date(0).toISOString(),
 };
 
-function normalizeBusinessSettings(row: BusinessSettings): BusinessSettings {
+function normalizeBusinessSettings(row: Partial<BusinessSettings> | BusinessSettings): BusinessSettings {
   return {
     ...DEFAULT_BUSINESS_SETTINGS,
     ...row,
-    paymentTicket: { ...defaultTicketLayoutConfig('payment'), ...(row.paymentTicket ?? {}) } as TicketLayoutConfig,
-    kitchenTicket: { ...defaultTicketLayoutConfig('kitchen'), ...(row.kitchenTicket ?? {}) } as TicketLayoutConfig,
+    demoSeedingMode: (row?.demoSeedingMode ?? DEFAULT_BUSINESS_SETTINGS.demoSeedingMode) as DemoSeedingMode,
+    paymentTicket: { ...defaultTicketLayoutConfig('payment'), ...((row?.paymentTicket ?? {}) as Partial<TicketLayoutConfig>) } as TicketLayoutConfig,
+    kitchenTicket: { ...defaultTicketLayoutConfig('kitchen'), ...((row?.kitchenTicket ?? {}) as Partial<TicketLayoutConfig>) } as TicketLayoutConfig,
   };
 }
 
 @Injectable({ providedIn: 'root' })
 export class BusinessSettingsService {
   private readonly db = inject(NovaPosDbService);
+  private readonly cached = signal<BusinessSettings | null>(null);
+
+  snapshot(): BusinessSettings | null {
+    return this.cached();
+  }
 
   async load(): Promise<BusinessSettings> {
     const row = await this.db.businessSettings.get('current');
-    if (row) return normalizeBusinessSettings(row);
-    const defaults: BusinessSettings = normalizeBusinessSettings({
-      ...DEFAULT_BUSINESS_SETTINGS,
-      updatedAt: new Date().toISOString(),
-    });
-    try {
-      await this.db.businessSettings.put(defaults);
-    } catch {
-      // ignore write error; still return defaults
+    const merged: BusinessSettings = row
+      ? normalizeBusinessSettings(row)
+      : normalizeBusinessSettings({
+          ...DEFAULT_BUSINESS_SETTINGS,
+          updatedAt: new Date().toISOString(),
+        });
+    if (!row) {
+      try {
+        await this.db.businessSettings.put(merged);
+      } catch {
+        // ignore write error; still return defaults
+      }
     }
-    return defaults;
+    this.cached.set(merged);
+    return merged;
   }
 
   async save(settings: BusinessSettings): Promise<BusinessSettings> {
@@ -137,6 +148,13 @@ export class BusinessSettingsService {
       updatedAt: new Date().toISOString(),
     });
     await this.db.businessSettings.put(toSave);
+    this.cached.set(toSave);
     return toSave;
+  }
+
+  async setDemoSeedingMode(mode: DemoSeedingMode): Promise<BusinessSettings> {
+    const current = this.cached() ?? (await this.load());
+    const next: BusinessSettings = { ...current, demoSeedingMode: mode };
+    return this.save(next);
   }
 }

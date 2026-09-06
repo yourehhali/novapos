@@ -1058,9 +1058,90 @@
         </div>
       </div>
 
+      <div class="settings-block danger-settings-block">
+        <p class="block-title">Reinitialiser les donnees locales</p>
+        <p class="block-subtitle danger-subtitle">
+          Attention : cette operation est definitive et concerne uniquement la caisse locale (hors connexion).
+          Tous les catalogues, commandes, tables, livreurs, ouvertures de caisse et evenements en file
+          seront effaces de IndexedDB.
+        </p>
+        <div class="form-card success-card" *ngIf="clearDataSuccess()">
+          <span>{{ clearDataSuccess() }}</span>
+        </div>
+        <div class="reset-row">
+          <button
+            type="button"
+            class="secondary-button danger"
+            (click)="openClearDataConfirm('BLANK')"
+          >
+            Vider TOUT (usine, mode vierge)
+          </button>
+          <button
+            type="button"
+            class="secondary-button"
+            (click)="openClearDataConfirm('DEMO')"
+          >
+            Revenir aux donnees de demonstration
+          </button>
+        </div>
+      </div>
+
       <div class="form-actions">
         <button type="button" class="primary-button" (click)="saveSettings()">Enregistrer</button>
       </div>
     </div>
   </ng-container>
 </section>
+
+<!-- Clear Data Confirm PIN Modal -->
+<ng-container *ngIf="clearDataOpen() && clearDataMode() as mode">
+  <div class="modal-root">
+    <div class="modal-overlay" (click)="cancelClearData()"></div>
+    <div class="modal-shell" role="dialog" aria-modal="true">
+    <div class="modal-shell-header">
+      <p class="modal-title">
+        Confirmer la reinitialisation
+        <span class="modal-title-mode">{{ mode === 'BLANK' ? '(vider tout)' : '(revenir demo)' }}</span>
+      </p>
+      <button type="button" class="modal-close" aria-label="Fermer" (click)="cancelClearData()">×</button>
+    </div>
+    <div class="modal-shell-body">
+      <p class="danger-lead">
+        Toutes les donnees locales stockees sur cette caisse seront
+        <strong>{{ mode === 'BLANK' ? 'supprimees definitivement' : 'remplacees par les donnees de demonstration' }}</strong>.
+      </p>
+      <p class="muted">Entrez le PIN de gestion (même que Management) pour confirmer.</p>
+      <label class="pin-field">
+        <span>PIN gestion</span>
+        <input
+          type="password"
+          autocomplete="off"
+          maxlength="12"
+          [ngModel]="clearDataPin()"
+          (ngModelChange)="clearDataPin.set($event); clearDataPinError.set(null)"
+          (keydown.enter)="submitClearDataPin()"
+          [disabled]="clearDataBusy()"
+          placeholder="• • • • • •"
+          inputmode="numeric"
+        />
+      </label>
+      <div class="form-card error-card" *ngIf="clearDataPinError()">
+        <span>{{ clearDataPinError() }}</span>
+      </div>
+    </div>
+    <div class="modal-shell-footer form-actions">
+      <button type="button" class="secondary-button" (click)="cancelClearData()" [disabled]="clearDataBusy()">
+        Annuler
+      </button>
+      <button
+        type="button"
+        class="primary-button"
+        [disabled]="clearDataBusy()"
+        (click)="submitClearDataPin()"
+      >
+        {{ clearDataBusy() ? 'Operation en cours...' : (mode === 'BLANK' ? 'Vider et sauvegarder' : 'Reinstaller demo') }}
+      </button>
+    </div>
+    </div>
+  </div>
+</ng-container>

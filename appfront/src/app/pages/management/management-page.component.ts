@@ -5,6 +5,7 @@ import {
   BusinessSettings,
   Category,
   DeliveryDriver,
+  DemoSeedingMode,
   FloorTable,
   LogoType,
   Product,
@@ -15,6 +16,7 @@ import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
 import { ReceiptService } from '../../core/services/receipt.service';
 import { PosService } from '../../core/services/pos.service';
+import { WorkspaceService } from '../../core/services/workspace.service';
 
 const PIN_STORAGE_KEY = 'novapos.management.pin.authed';
 const MANAGEMENT_PIN = '281998';
@@ -34,6 +36,7 @@ export class ManagementPageComponent implements OnInit {
   private readonly businessSettingsService = inject(BusinessSettingsService);
   private readonly receiptService = inject(ReceiptService);
   private readonly posService = inject(PosService);
+  private readonly workspaceService = inject(WorkspaceService);
 
   protected readonly pinInput = signal('');
   protected readonly pinError = signal<string | null>(null);
@@ -56,6 +59,12 @@ export class ManagementPageComponent implements OnInit {
   protected readonly saveSettingsError = signal<string | null>(null);
   protected readonly saveSettingsSuccess = signal<string | null>(null);
   protected readonly settingsTicketTab = signal<SettingsTicketKind>('payment');
+  protected readonly clearDataMode = signal<DemoSeedingMode | null>(null);
+  protected readonly clearDataOpen = signal(false);
+  protected readonly clearDataPin = signal('');
+  protected readonly clearDataPinError = signal<string | null>(null);
+  protected readonly clearDataBusy = signal(false);
+  protected readonly clearDataSuccess = signal<string | null>(null);
 
   protected filteredProducts = computed(() => {
     const q = this.productSearch().trim().toLowerCase();
@@ -508,6 +517,54 @@ export class ManagementPageComponent implements OnInit {
 
   clearTicketLayoutLogoImage(kind: SettingsTicketKind): void {
     this.setTicketLayoutField(kind, 'logoImageDataUrl', '');
+  }
+
+  openClearDataConfirm(mode: DemoSeedingMode): void {
+    this.clearDataMode.set(mode);
+    this.clearDataPin.set('');
+    this.clearDataPinError.set(null);
+    this.clearDataSuccess.set(null);
+    this.clearDataOpen.set(true);
+  }
+
+  cancelClearData(): void {
+    if (this.clearDataBusy()) return;
+    this.clearDataOpen.set(false);
+    this.clearDataMode.set(null);
+    this.clearDataPin.set('');
+    this.clearDataPinError.set(null);
+  }
+
+  async submitClearDataPin(): Promise<void> {
+    if (this.clearDataBusy()) return;
+    const mode = this.clearDataMode();
+    if (!mode) return;
+    const pin = this.clearDataPin().trim();
+    if (pin !== MANAGEMENT_PIN) {
+      this.clearDataPinError.set('PIN incorrect.');
+      return;
+    }
+    this.clearDataPinError.set(null);
+    this.clearDataBusy.set(true);
+    try {
+      await this.workspaceService.wipeAllLocalData(mode);
+      this.receiptService.invalidateSettingsCache();
+      this.workspaceService.invalidateAllCaches();
+      this.posService.clearCart();
+      await this.refreshAll();
+      await this.loadSettings();
+      this.clearDataSuccess.set(
+        mode === 'BLANK'
+          ? 'Toutes les donnees locales ont ete supprimees. Vous pouvez fermer et reouvrir l app.'
+          : 'Les donnees de demonstration ont ete reinstallees.',
+      );
+      this.clearDataOpen.set(false);
+      this.clearDataMode.set(null);
+    } catch (err: unknown) {
+      this.clearDataPinError.set(`Echec reinitialisation : ${(err as Error)?.message ?? String(err)}`);
+    } finally {
+      this.clearDataBusy.set(false);
+    }
   }
 
   async handleLogoImageFile(event: Event): Promise<void> {

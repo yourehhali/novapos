@@ -216,6 +216,7 @@ export interface ReportPrintState {
 }
 
 export type LogoType = 'TEXT' | 'IMAGE';
+export type DemoSeedingMode = 'BLANK' | 'DEMO';
 
 export interface TicketLayoutConfig {
   showBusinessInfo: boolean;
@@ -247,6 +248,7 @@ export interface BusinessSettings {
   footerLine3: string;
   paymentTicket?: TicketLayoutConfig | null;
   kitchenTicket?: TicketLayoutConfig | null;
+  demoSeedingMode: DemoSeedingMode;
   receiptPrinterName: string;
   receiptQueueName: string;
   receiptPrinterIp: string;

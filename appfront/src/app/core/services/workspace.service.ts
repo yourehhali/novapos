@@ -1,9 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import {
+  BusinessSettings,
   CompletedOrder,
   Category,
   DashboardSummary,
+  DemoSeedingMode,
   PrinterConfig,
   Product,
   SyncStatus,
@@ -11,6 +13,7 @@ import {
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { ApiService } from './api.service';
 import { SessionService } from './session.service';
+import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS } from './business-settings.service';
 import {
   getOfflineDemoCatalog,
   getOfflineDemoDashboard,
@@ -25,8 +28,14 @@ export class WorkspaceService {
   private readonly db = inject(NovaPosDbService);
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
+  private readonly businessSettings = inject(BusinessSettingsService);
   private catalogCache: { products: Product[]; categories: Category[] } | null = null;
   private printersCache: PrinterConfig[] | null = null;
+
+  invalidateAllCaches(): void {
+    this.catalogCache = null;
+    this.printersCache = null;
+  }
 
   async loadCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
     const token = this.session.accessToken();
@@ -102,9 +111,11 @@ export class WorkspaceService {
   private async loadCachedOrDemoCatalog(
     forceDemoCatalog = false,
   ): Promise<{ products: Product[]; categories: Category[] }> {
+    const settings = this.businessSettings.snapshot() ?? await this.businessSettings.load();
+    const seedingMode: DemoSeedingMode = settings?.demoSeedingMode ?? DEFAULT_BUSINESS_SETTINGS.demoSeedingMode;
     const demoCatalog = this.normalizeCatalog(getOfflineDemoCatalog());
 
-    if (forceDemoCatalog) {
+    if (forceDemoCatalog && seedingMode === 'DEMO') {
       return this.persistCatalog(demoCatalog);
     }
 
@@ -123,11 +134,19 @@ export class WorkspaceService {
         this.catalogCache = cachedCatalog;
         return this.catalogCache;
       }
-
-      return this.persistCatalog(demoCatalog);
+      if (seedingMode === 'DEMO') {
+        return this.persistCatalog(demoCatalog);
+      }
+      this.catalogCache = cachedCatalog;
+      return this.catalogCache;
     }
 
-    return this.persistCatalog(demoCatalog);
+    if (seedingMode === 'DEMO') {
+      return this.persistCatalog(demoCatalog);
+    }
+    const cachedCatalog = { products: products.slice(), categories: categories.slice() };
+    this.catalogCache = cachedCatalog;
+    return cachedCatalog;
   }
 
   private normalizeCatalog(catalog: {
@@ -279,6 +298,13 @@ export class WorkspaceService {
       return printers;
     }
 
+    const settings = this.businessSettings.snapshot() ?? await this.businessSettings.load();
+    const seedingMode = settings?.demoSeedingMode ?? DEFAULT_BUSINESS_SETTINGS.demoSeedingMode;
+    if (seedingMode === 'BLANK') {
+      this.printersCache = [];
+      return [];
+    }
+
     const demoPrinters = getOfflineDemoPrinters();
     await this.db.printers.bulkPut(demoPrinters);
     this.printersCache = demoPrinters;
@@ -379,5 +405,54 @@ export class WorkspaceService {
 
   private syncStatusKey(branchId: string, deviceId: string): string {
     return `${branchId}:${deviceId}`;
+  }
+
+  async wipeAllLocalData(mode: DemoSeedingMode): Promise<void> {
+    const db = this.db;
+    const session = this.session;
+
+    const tablesToClear = [
+      db.products,
+      db.categories,
+      db.floorTables,
+      db.deliveryDrivers,
+      db.completedOrders,
+      db.eventQueue,
+      db.syncCursors,
+      db.reportPrintStates,
+      db.dashboard,
+      db.cashOpenings,
+      db.sessionContext,
+      db.bootstrapSessions,
+      db.printers,
+    ].filter((tbl) => Boolean(tbl)) as any[];
+
+    const storeArgs: any[] = [...tablesToClear, db.businessSettings];
+    await db.transaction('rw', storeArgs, async () => {
+      for (const tbl of tablesToClear) {
+        try { await tbl.clear(); } catch { /* swallow */ }
+      }
+
+      if (mode === 'DEMO') {
+        const catalog = this.normalizeCatalog(getOfflineDemoCatalog());
+        await db.products.bulkPut(catalog.products);
+        await db.categories.bulkPut(catalog.categories);
+        try { await db.printers.bulkPut(getOfflineDemoPrinters()); } catch { /* swallow */ }
+      }
+
+      session.clear();
+      try { sessionStorage.clear(); } catch { /* swallow */ }
+
+      const existingSettings = (await db.businessSettings.get('current')) ?? {} as Partial<BusinessSettings>;
+      const nextSettings: BusinessSettings = {
+        ...DEFAULT_BUSINESS_SETTINGS,
+        ...existingSettings,
+        demoSeedingMode: mode,
+        updatedAt: new Date().toISOString(),
+      };
+      await db.businessSettings.put(nextSettings);
+    });
+
+    this.invalidateAllCaches();
   }
 }
