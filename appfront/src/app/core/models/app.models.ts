@@ -265,11 +265,19 @@ export interface PrintTicketRequest {
   kind: 'KITCHEN' | 'PAYMENT';
   printer?: PrinterConfig;
   order: CompletedOrder;
+  html?: string;
+  paperWidthMm?: number;
+  systemPrinterName?: string;
+  silent?: boolean;
 }
 
 export interface PrintSalesSummaryRequest {
   printer?: PrinterConfig;
   report: SalesSummaryReport;
+  html?: string;
+  paperWidthMm?: number;
+  systemPrinterName?: string;
+  silent?: boolean;
 }
 
 export interface PrintTicketResult {

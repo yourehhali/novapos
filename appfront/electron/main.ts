@@ -21,6 +21,8 @@ interface PrinterProfile {
   systemPrinterName?: string;
 }
 
+type OrderChannel = 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON';
+
 interface TicketLine {
   name: string;
   quantity: number;
@@ -29,7 +31,7 @@ interface TicketLine {
 
 interface TicketOrder {
   orderNumber: string;
-  cashierName: string;
+  cashierName?: string;
   total: number;
   currency: string;
   paymentMethod: string;
@@ -39,12 +41,21 @@ interface TicketOrder {
   createdAt: string;
   kitchenPrintedAt?: string;
   paidAt?: string;
+  channel?: OrderChannel;
+  tableNumber?: string;
+  livreurId?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
 }
 
 interface PrintTicketRequest {
   kind: TicketKind;
   printer?: PrinterProfile;
   order: TicketOrder;
+  html?: string;
+  paperWidthMm?: number;
+  systemPrinterName?: string;
+  silent?: boolean;
 }
 
 interface SalesSummaryEntry {
@@ -71,6 +82,10 @@ interface SalesSummaryReport {
 interface PrintSalesSummaryRequest {
   printer?: PrinterProfile;
   report: SalesSummaryReport;
+  html?: string;
+  paperWidthMm?: number;
+  systemPrinterName?: string;
+  silent?: boolean;
 }
 
 type PrintOptionsWithCssPageSize = Electron.WebContentsPrintOptions & {
@@ -515,21 +530,22 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
       : request.order.paidAt || request.order.createdAt,
   );
 
+  const headerMeta: string[] = [
+    request.order.orderNumber,
+    `${request.kind === 'KITCHEN' ? 'PREPARE' : 'PAYE'} ${printedAt}`,
+  ];
+  for (const line of formatChannelEscPos(request.order)) {
+    headerMeta.push(line);
+  }
+
   chunks.push(escposInit());
   appendTicketHeader(
     chunks,
     request.printer,
     request.kind === 'KITCHEN' ? 'TICKET CUISINE' : 'TICKET PAIEMENT',
-    [
-      request.order.orderNumber,
-      `${request.kind === 'KITCHEN' ? 'PREPARE' : 'PAYE'} ${printedAt}`,
-    ],
+    headerMeta,
   );
-  chunks.push(textLine(' '.repeat(width)));
-  chunks.push(textLine('Hello Ticket'));
-  chunks.push(textLine(' '.repeat(width)));
   chunks.push(alignLeft());
-
   chunks.push(textLine('-'.repeat(width)));
 
   if (request.kind === 'PAYMENT') {
@@ -889,6 +905,41 @@ function getErrorMessage(error: unknown, fallbackMessage: string): string {
   }
 
   return fallbackMessage;
+}
+
+function formatChannelEscPos(order: TicketOrder): string[] {
+  const lines: string[] = [];
+  const channel =
+    order.channel === 'EMPORTER' || order.channel === 'LIVRAISON' || order.channel === 'SUR_PLACE'
+      ? order.channel
+      : 'SUR_PLACE';
+
+  switch (channel) {
+    case 'SUR_PLACE':
+      lines.push('CANAL: SUR PLACE');
+      if (order.tableNumber) lines.push(`TABLE: ${order.tableNumber}`);
+      break;
+    case 'EMPORTER':
+      lines.push('CANAL: A EMPORTER');
+      break;
+    case 'LIVRAISON':
+      lines.push('CANAL: LIVRAISON');
+      if (order.livreurId) lines.push(`LIVREUR: ${order.livreurId}`);
+      break;
+  }
+
+  if (order.customerPhone) lines.push(`TEL: ${order.customerPhone}`);
+  if (order.deliveryAddress) {
+    const addr = sanitizeForEscPos(order.deliveryAddress);
+    if (addr.length > 38) {
+      for (const chunk of wrapText(addr, 38)) {
+        lines.push(`ADRESSE: ${chunk}`);
+      }
+    } else {
+      lines.push(`ADRESSE: ${addr}`);
+    }
+  }
+  return lines;
 }
 
 async function waitForPrintLayout(printWindow: BrowserWindow): Promise<void> {

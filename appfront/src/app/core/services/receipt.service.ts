@@ -17,6 +17,7 @@ import { DesktopBridgeService } from './desktop-bridge.service';
 
 type TicketKind = PrintTicketRequest['kind'];
 const DESKTOP_TIMEOUT_MS = 450;
+const DESKTOP_ESCPOS_TIMEOUT_MS = 5000;
 
 @Injectable({ providedIn: 'root' })
 export class ReceiptService {
@@ -43,12 +44,20 @@ export class ReceiptService {
   async printSalesSummary(report: SalesSummaryReport): Promise<boolean> {
     const settings = await this.loadSettings();
     const printer = this.resolvePrinterFromSettings('PAYMENT', settings);
+    const html = this.buildSalesSummaryHtml({ printer, report }, settings);
 
     let desktopFailure: string | null = null;
     if (this.desktopBridge.isDesktop()) {
       try {
-        const desktopPromise = this.desktopBridge.printSalesSummary({ printer, report });
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_TIMEOUT_MS));
+        const desktopPromise = this.desktopBridge.printSalesSummary({
+          printer,
+          report,
+          html,
+          paperWidthMm: printer?.paperWidthMm ?? settings.receiptPaperWidthMm,
+          systemPrinterName: printer?.systemPrinterName || printer?.name,
+          silent: printer?.silent ?? true,
+        });
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
         const result = await Promise.race([desktopPromise, timeout]);
         if (result?.success) return true;
         if (result) desktopFailure = this.describePrintFailure(result, 'Desktop sales summary printing failed.');
@@ -57,9 +66,7 @@ export class ReceiptService {
       }
     }
 
-    const browserResult = this.printViaIframe(
-      this.buildSalesSummaryHtml({ printer, report }, settings),
-    );
+    const browserResult = this.printViaIframe(html);
     if (browserResult.success) return true;
 
     this.showPrintError(
@@ -73,12 +80,22 @@ export class ReceiptService {
   private async printTicket(kind: TicketKind, order: CompletedOrder): Promise<boolean> {
     const [settings, drivers] = await Promise.all([this.loadSettings(), this.loadDrivers()]);
     const printer = this.resolvePrinterFromSettings(kind, settings);
+    const html = this.buildTicketHtml(kind, order, printer, settings, drivers);
+    const paperWidthMm = printer?.paperWidthMm ?? (kind === 'KITCHEN' ? settings.kitchenPaperWidthMm : settings.receiptPaperWidthMm);
 
     let desktopFailure: string | null = null;
     if (this.desktopBridge.isDesktop()) {
       try {
-        const desktopPromise = this.desktopBridge.printTicket({ kind, printer, order });
-        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_TIMEOUT_MS));
+        const desktopPromise = this.desktopBridge.printTicket({
+          kind,
+          printer,
+          order,
+          html,
+          paperWidthMm,
+          systemPrinterName: printer?.systemPrinterName || printer?.name,
+          silent: printer?.silent ?? true,
+        });
+        const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
         const result = await Promise.race([desktopPromise, timeout]);
         if (result?.success) return true;
         if (result) desktopFailure = this.describePrintFailure(result, 'Desktop printing failed.');
@@ -87,7 +104,7 @@ export class ReceiptService {
       }
     }
 
-    const browserResult = this.printViaIframe(this.buildTicketHtml(kind, order, printer, settings, drivers));
+    const browserResult = this.printViaIframe(html);
     if (browserResult.success) return true;
 
     const ticketLabel = kind === 'KITCHEN' ? 'le ticket cuisine' : 'le ticket de paiement';
@@ -267,7 +284,6 @@ export class ReceiptService {
     const businessBlock = this.renderBusinessInfo(settings);
     const footer = this.renderFooter(settings);
     const channelLines = this.formatChannel(order, drivers);
-    const cashierLine = order.cashierName ? `<div>Caissier: ${this.escapeHtml(order.cashierName)}</div>` : '';
 
     return `
       <!doctype html>
@@ -311,7 +327,6 @@ export class ReceiptService {
               <div class="meta">
                 <div>${this.escapeHtml(order.orderNumber)}</div>
                 ${channelLines.map((l) => `<div>${this.escapeHtml(l)}</div>`).join('')}
-                ${cashierLine}
                 <div>${kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${this.escapeHtml(printedAt)}</div>
               </div>
             </div>
