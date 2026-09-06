@@ -1,15 +1,16 @@
 import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { BusinessSettings, Category, LogoType, Product } from '../../core/models/app.models';
+import { BusinessSettings, Category, DeliveryDriver, FloorTable, LogoType, Product, ResourceStatus } from '../../core/models/app.models';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
 import { ReceiptService } from '../../core/services/receipt.service';
+import { PosService } from '../../core/services/pos.service';
 
 const PIN_STORAGE_KEY = 'novapos.management.pin.authed';
 const MANAGEMENT_PIN = '281998';
 
-type MgmtTab = 'categories' | 'products' | 'settings';
+type MgmtTab = 'categories' | 'products' | 'settings' | 'tables' | 'drivers';
 
 @Component({
   selector: 'app-management-page',
@@ -22,6 +23,7 @@ export class ManagementPageComponent implements OnInit {
   private readonly db = inject(NovaPosDbService);
   private readonly businessSettingsService = inject(BusinessSettingsService);
   private readonly receiptService = inject(ReceiptService);
+  private readonly posService = inject(PosService);
 
   protected readonly pinInput = signal('');
   protected readonly pinError = signal<string | null>(null);
@@ -31,9 +33,13 @@ export class ManagementPageComponent implements OnInit {
   protected readonly products = signal<Product[]>([]);
   protected readonly categories = signal<Category[]>([]);
   protected readonly productSearch = signal('');
+  protected readonly floorTables = signal<FloorTable[]>([]);
+  protected readonly deliveryDrivers = signal<DeliveryDriver[]>([]);
 
   protected readonly editingCategory = signal<Category | null>(null);
   protected readonly editingProduct = signal<Product | null>(null);
+  protected readonly editingFloorTable = signal<FloorTable | null>(null);
+  protected readonly editingDeliveryDriver = signal<DeliveryDriver | null>(null);
   protected readonly saveError = signal<string | null>(null);
 
   protected readonly editingSettings = signal<BusinessSettings | null>(null);
@@ -84,6 +90,8 @@ export class ManagementPageComponent implements OnInit {
     this.writePinSession('');
     this.editingCategory.set(null);
     this.editingProduct.set(null);
+    this.editingFloorTable.set(null);
+    this.editingDeliveryDriver.set(null);
     this.editingSettings.set(null);
     this.saveSettingsError.set(null);
     this.saveSettingsSuccess.set(null);
@@ -94,6 +102,8 @@ export class ManagementPageComponent implements OnInit {
     this.saveError.set(null);
     this.editingCategory.set(null);
     this.editingProduct.set(null);
+    this.editingFloorTable.set(null);
+    this.editingDeliveryDriver.set(null);
     this.saveSettingsError.set(null);
     this.saveSettingsSuccess.set(null);
     if (tab === 'settings') {
@@ -245,6 +255,156 @@ export class ManagementPageComponent implements OnInit {
     await this.refreshAll();
   }
 
+  // ---- Floor Tables ----
+
+  protected isNewFloorTable(t: FloorTable): boolean {
+    return !this.floorTables().some((row) => row.id === t.id);
+  }
+
+  createFloorTable(): void {
+    const count = this.floorTables().length;
+    this.saveError.set(null);
+    this.editingFloorTable.set({
+      id: `tbl-new-${crypto.randomUUID().slice(0, 10)}`,
+      number: String(count + 1),
+      label: '',
+      zone: '',
+      capacity: 4,
+      status: 'ACTIVE',
+    });
+  }
+
+  editFloorTable(t: FloorTable): void {
+    this.saveError.set(null);
+    this.editingFloorTable.set({ ...t });
+  }
+
+  cancelFloorTable(): void {
+    this.editingFloorTable.set(null);
+    this.saveError.set(null);
+  }
+
+  setTableField<K extends keyof FloorTable>(field: K, value: FloorTable[K]): void {
+    const current = this.editingFloorTable();
+    if (!current) return;
+    this.editingFloorTable.set({ ...current, [field]: value });
+  }
+
+  setTableStatus(value: string): void {
+    this.setTableField('status', (value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE') as ResourceStatus);
+  }
+
+  setTableCapacity(v: string | number): void {
+    const n = Math.max(1, Math.floor(Number(v) || 1));
+    this.setTableField('capacity', n);
+  }
+
+  async saveFloorTable(): Promise<void> {
+    const t = this.editingFloorTable();
+    this.saveError.set(null);
+    if (!t) return;
+    if (!t.number?.trim()) {
+      this.saveError.set('Le numero de table est requis.');
+      return;
+    }
+    try {
+      if (t.label.trim() === '') t.label = `Table ${t.number.trim()}`;
+      await this.posService.saveFloorTable(t);
+      this.editingFloorTable.set(null);
+      await this.refreshFloorTables();
+    } catch (err: unknown) {
+      this.saveError.set(`Echec d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+    }
+  }
+
+  async deleteFloorTable(t: FloorTable): Promise<void> {
+    if (!confirm(`Supprimer la table "${t.label || t.number}" ?`)) return;
+    try {
+      await this.posService.deleteFloorTable(t.id);
+      await this.refreshFloorTables();
+    } catch (err: unknown) {
+      this.saveError.set(`Echec suppression : ${(err as Error)?.message ?? String(err)}`);
+    }
+  }
+
+  private async refreshFloorTables(): Promise<void> {
+    this.floorTables.set(await this.posService.listFloorTables());
+  }
+
+  // ---- Delivery Drivers / Livreurs ----
+
+  protected isNewDeliveryDriver(d: DeliveryDriver): boolean {
+    return !this.deliveryDrivers().some((row) => row.id === d.id);
+  }
+
+  createDeliveryDriver(): void {
+    const count = this.deliveryDrivers().length;
+    this.saveError.set(null);
+    this.editingDeliveryDriver.set({
+      id: `liv-new-${crypto.randomUUID().slice(0, 10)}`,
+      number: String(count + 1),
+      name: '',
+      phone: '',
+      vehicle: '',
+      status: 'ACTIVE',
+    });
+  }
+
+  editDeliveryDriver(d: DeliveryDriver): void {
+    this.saveError.set(null);
+    this.editingDeliveryDriver.set({ ...d });
+  }
+
+  cancelDeliveryDriver(): void {
+    this.editingDeliveryDriver.set(null);
+    this.saveError.set(null);
+  }
+
+  setDriverField<K extends keyof DeliveryDriver>(field: K, value: DeliveryDriver[K]): void {
+    const current = this.editingDeliveryDriver();
+    if (!current) return;
+    this.editingDeliveryDriver.set({ ...current, [field]: value });
+  }
+
+  setDriverStatus(value: string): void {
+    this.setDriverField('status', (value === 'INACTIVE' ? 'INACTIVE' : 'ACTIVE') as ResourceStatus);
+  }
+
+  async saveDeliveryDriver(): Promise<void> {
+    const d = this.editingDeliveryDriver();
+    this.saveError.set(null);
+    if (!d) return;
+    if (!d.name.trim()) {
+      this.saveError.set('Le nom du livreur est requis.');
+      return;
+    }
+    if (!d.number?.trim()) {
+      this.saveError.set('Le numero du livreur est requis.');
+      return;
+    }
+    try {
+      await this.posService.saveDeliveryDriver(d);
+      this.editingDeliveryDriver.set(null);
+      await this.refreshDeliveryDrivers();
+    } catch (err: unknown) {
+      this.saveError.set(`Echec d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+    }
+  }
+
+  async deleteDeliveryDriver(d: DeliveryDriver): Promise<void> {
+    if (!confirm(`Supprimer le livreur "${d.name || d.number}" ?`)) return;
+    try {
+      await this.posService.deleteDeliveryDriver(d.id);
+      await this.refreshDeliveryDrivers();
+    } catch (err: unknown) {
+      this.saveError.set(`Echec suppression : ${(err as Error)?.message ?? String(err)}`);
+    }
+  }
+
+  private async refreshDeliveryDrivers(): Promise<void> {
+    this.deliveryDrivers.set(await this.posService.listDeliveryDrivers());
+  }
+
   // ---- Business Settings ----
 
   private async loadSettings(): Promise<void> {
@@ -335,7 +495,12 @@ export class ManagementPageComponent implements OnInit {
   // ---- Helpers ----
 
   private async refreshAll(): Promise<void> {
-    await Promise.all([this.refreshCategories(), this.refreshProducts()]);
+    await Promise.all([
+      this.refreshCategories(),
+      this.refreshProducts(),
+      this.refreshFloorTables(),
+      this.refreshDeliveryDrivers(),
+    ]);
   }
 
   private async refreshCategories(): Promise<void> {

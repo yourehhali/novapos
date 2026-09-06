@@ -2,7 +2,11 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
 import {
+  CashOpening,
   CompletedOrder,
+  DeliveryDriver,
+  FloorTable,
+  OrderChannel,
   PaymentMethod,
   PosLine,
   Product,
@@ -10,6 +14,13 @@ import {
   SyncEventEnvelope,
 } from '../models/app.models';
 import { SessionService } from './session.service';
+
+function dayKeyFor(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 @Injectable({ providedIn: 'root' })
 export class PosService {
@@ -21,10 +32,34 @@ export class PosService {
   readonly paymentMethod = signal<'CASH' | 'CARD'>('CASH');
   readonly lastOrder = signal<CompletedOrder | null>(null);
   readonly editingPreparedOrderId = signal<string | null>(null);
+  readonly channel = signal<OrderChannel>('SUR_PLACE');
+  readonly selectedTableNumber = signal<string>('');
+  readonly selectedLivreurId = signal<string>('');
+  readonly customerPhone = signal<string>('');
+  readonly deliveryAddress = signal<string>('');
 
   readonly subtotal = computed(() =>
     this.cart().reduce((sum, line) => sum + line.total, 0),
   );
+
+  setChannel(channel: OrderChannel): void {
+    this.channel.set(channel);
+    if (channel !== 'SUR_PLACE') this.selectedTableNumber.set('');
+    if (channel !== 'LIVRAISON') {
+      this.selectedLivreurId.set('');
+      this.customerPhone.set('');
+      this.deliveryAddress.set('');
+    }
+  }
+
+  resetContext(): void {
+    this.channel.set('SUR_PLACE');
+    this.selectedTableNumber.set('');
+    this.selectedLivreurId.set('');
+    this.customerPhone.set('');
+    this.deliveryAddress.set('');
+    this.editingPreparedOrderId.set(null);
+  }
 
   addProduct(product: Product): void {
     const current = [...this.cart()];
@@ -60,7 +95,87 @@ export class PosService {
 
   clearCart(): void {
     this.cart.set([]);
-    this.editingPreparedOrderId.set(null);
+    this.resetContext();
+  }
+
+  async listFloorTables(): Promise<FloorTable[]> {
+    return (await this.db.floorTables.toArray()).sort((a, b) => {
+      const zone = (a.zone || '').localeCompare(b.zone || '');
+      if (zone !== 0) return zone;
+      return Number(a.number || 0) - Number(b.number || 0);
+    });
+  }
+
+  async saveFloorTable(table: FloorTable): Promise<FloorTable> {
+    await this.db.floorTables.put(table);
+    return table;
+  }
+
+  async deleteFloorTable(id: string): Promise<void> {
+    await this.db.floorTables.delete(id);
+  }
+
+  async listDeliveryDrivers(): Promise<DeliveryDriver[]> {
+    return (await this.db.deliveryDrivers.toArray()).sort((a, b) =>
+      Number(a.number || 0) - Number(b.number || 0),
+    );
+  }
+
+  async saveDeliveryDriver(driver: DeliveryDriver): Promise<DeliveryDriver> {
+    await this.db.deliveryDrivers.put(driver);
+    return driver;
+  }
+
+  async deleteDeliveryDriver(id: string): Promise<void> {
+    await this.db.deliveryDrivers.delete(id);
+  }
+
+  private cashOpeningIdFor(branchId: string, dayKey: string): string {
+    return `${branchId}-${dayKey}`;
+  }
+
+  async getTodayCashOpening(branchId?: string): Promise<CashOpening | null> {
+    const effectiveBranchId = branchId ?? this.session.branch()?.branchId;
+    if (!effectiveBranchId) return null;
+    const dayKey = dayKeyFor(new Date());
+    const id = this.cashOpeningIdFor(effectiveBranchId, dayKey);
+    const found = await this.db.cashOpenings.get(id);
+    return found ?? null;
+  }
+
+  async setTodayCashOpening(
+    amount: number,
+    currency: string,
+    note?: string,
+    operatorName?: string,
+    branchId?: string,
+  ): Promise<CashOpening> {
+    const effectiveBranchId = branchId ?? this.session.branch()?.branchId;
+    if (!effectiveBranchId) {
+      throw new Error('Aucune session active.');
+    }
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new Error('Le montant du fond de caisse est invalide.');
+    }
+    const dayKey = dayKeyFor(new Date());
+    const now = new Date().toISOString();
+    const id = this.cashOpeningIdFor(effectiveBranchId, dayKey);
+    const existing = await this.db.cashOpenings.get(id);
+    const record: CashOpening = existing
+      ? { ...existing, amount, currency, note: note ?? existing.note, operatorName: operatorName ?? existing.operatorName, lastUpdatedAt: now }
+      : {
+          id,
+          branchId: effectiveBranchId,
+          dayKey,
+          amount,
+          currency,
+          note,
+          operatorName,
+          setAt: now,
+          lastUpdatedAt: now,
+        };
+    await this.db.cashOpenings.put(record);
+    return record;
   }
 
   async prepareOrder(): Promise<CompletedOrder | null> {
@@ -91,6 +206,11 @@ export class PosService {
         lines: this.cart().map((line) => ({ ...line })),
         lastUpdatedAt: now,
         version: normalized.version + 1,
+        channel: this.channel(),
+        tableNumber: this.channel() === 'SUR_PLACE' ? this.selectedTableNumber() || undefined : undefined,
+        livreurId: this.channel() === 'LIVRAISON' ? this.selectedLivreurId() || undefined : undefined,
+        deliveryAddress: this.channel() === 'LIVRAISON' ? this.deliveryAddress() || undefined : undefined,
+        customerPhone: this.customerPhone() || undefined,
       };
 
       const orderEdited = this.createOrderEvent(
@@ -135,6 +255,7 @@ export class PosService {
     }
 
     const orderId = crypto.randomUUID();
+    const channel = this.channel();
     const order: CompletedOrder = {
       id: orderId,
       orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
@@ -144,6 +265,11 @@ export class PosService {
       currency: 'MAD',
       paymentMethod: 'UNPAID',
       status: 'PREPARED',
+      channel,
+      tableNumber: channel === 'SUR_PLACE' ? this.selectedTableNumber() || undefined : undefined,
+      livreurId: channel === 'LIVRAISON' ? this.selectedLivreurId() || undefined : undefined,
+      deliveryAddress: channel === 'LIVRAISON' ? this.deliveryAddress() || undefined : undefined,
+      customerPhone: this.customerPhone() || undefined,
       lineCount: this.cart().length,
       lines: this.cart().map((line) => ({ ...line })),
       createdAt: now,
@@ -258,6 +384,11 @@ export class PosService {
     this.paymentMethod.set('CASH');
     this.editingPreparedOrderId.set(orderId);
     this.lastOrder.set(order);
+    this.channel.set(order.channel);
+    this.selectedTableNumber.set(order.tableNumber ?? '');
+    this.selectedLivreurId.set(order.livreurId ?? '');
+    this.deliveryAddress.set(order.deliveryAddress ?? '');
+    this.customerPhone.set(order.customerPhone ?? '');
     await this.router.navigateByUrl('/pos');
     return true;
   }
@@ -312,12 +443,17 @@ export class PosService {
     const status = order.status ?? (paymentMethod === 'UNPAID' ? 'PREPARED' : 'PAID');
     const createdAt = order.createdAt ?? new Date().toISOString();
     const lastUpdatedAt = order.lastUpdatedAt ?? order.paidAt ?? order.kitchenPrintedAt ?? createdAt;
+    const channel: OrderChannel =
+      order.channel === 'SUR_PLACE' || order.channel === 'EMPORTER' || order.channel === 'LIVRAISON'
+        ? order.channel
+        : 'SUR_PLACE';
 
     return {
       ...order,
       cashierName: order.cashierName || 'Unknown operator',
       paymentMethod,
       status,
+      channel,
       lineCount: order.lineCount ?? lines.length,
       lines,
       createdAt,

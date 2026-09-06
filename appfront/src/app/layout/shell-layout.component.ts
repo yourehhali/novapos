@@ -40,6 +40,15 @@ import { BusinessSettingsService } from '../core/services/business-settings.serv
             </svg>
             <span class="nav-label" *ngIf="!sidebarCollapsed()">POS</span>
           </a>
+          <a routerLink="/service" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Service' : null">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <ellipse cx="12" cy="9" rx="6" ry="3" />
+              <path d="M6 9v5c0 1.66 2.69 3 6 3s6-1.34 6-3V9" />
+              <path d="M12 17v4" />
+              <path d="M8 21h8" />
+            </svg>
+            <span class="nav-label" *ngIf="!sidebarCollapsed()">Service</span>
+          </a>
           <a routerLink="/orders" routerLinkActive="active" [attr.title]="sidebarCollapsed() ? 'Historique' : null">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="M4 4h13l3 3v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />

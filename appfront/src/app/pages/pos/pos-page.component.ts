@@ -1,5 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Category, Product } from '../../core/models/app.models';
+import { Category, DeliveryDriver, FloorTable, OrderChannel, Product } from '../../core/models/app.models';
 import { PosService } from '../../core/services/pos.service';
 import { ReceiptService } from '../../core/services/receipt.service';
 import { SyncService } from '../../core/services/sync.service';
@@ -19,9 +19,12 @@ export class PosPageComponent implements OnInit {
   protected readonly pos = inject(PosService);
   protected readonly products = signal<Product[]>([]);
   protected readonly categories = signal<Category[]>([]);
+  protected readonly floorTables = signal<FloorTable[]>([]);
+  protected readonly deliveryDrivers = signal<DeliveryDriver[]>([]);
   protected readonly selectedCategory = signal('all');
   protected readonly busy = signal(false);
   protected readonly searchTerm = signal('');
+  protected readonly prepareError = signal<string | null>(null);
 
   protected readonly filteredProducts = computed(() => {
     const search = this.searchTerm().trim().toLowerCase();
@@ -38,9 +41,38 @@ export class PosPageComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
-    const catalog = await this.workspaceService.loadCatalog();
+    const [catalog, tables, drivers] = await Promise.all([
+      this.workspaceService.loadCatalog(),
+      this.pos.listFloorTables(),
+      this.pos.listDeliveryDrivers(),
+    ]);
     this.products.set(catalog.products);
     this.categories.set(catalog.categories);
+    this.floorTables.set(tables);
+    this.deliveryDrivers.set(drivers.filter((d) => d.status === 'ACTIVE'));
+  }
+
+  protected setChannel(channel: OrderChannel): void {
+    this.pos.setChannel(channel);
+    this.prepareError.set(null);
+  }
+
+  protected setSelectedTableNumber(value: string): void {
+    this.pos.selectedTableNumber.set(value);
+    this.prepareError.set(null);
+  }
+
+  protected setSelectedLivreurId(value: string): void {
+    this.pos.selectedLivreurId.set(value);
+    this.prepareError.set(null);
+  }
+
+  protected setCustomerPhone(value: string): void {
+    this.pos.customerPhone.set(value);
+  }
+
+  protected setDeliveryAddress(value: string): void {
+    this.pos.deliveryAddress.set(value);
   }
 
   protected add(product: Product): void {
@@ -56,8 +88,28 @@ export class PosPageComponent implements OnInit {
 
   protected async prepare(): Promise<void> {
     this.busy.set(true);
+    this.prepareError.set(null);
 
     try {
+      const channel = this.pos.channel();
+      if (channel === 'SUR_PLACE' && !this.pos.selectedTableNumber()) {
+        const hasTables = this.floorTables().length > 0;
+        this.prepareError.set(
+          hasTables
+            ? 'Selectionnez une table pour "Sur place".'
+            : 'Aucune table definie. Ajoutez-en dans Gestion > Tables ou utilisez le canal "A emporter".'
+        );
+        return;
+      }
+      if (channel === 'LIVRAISON' && !this.pos.selectedLivreurId()) {
+        const hasDrivers = this.deliveryDrivers().length > 0;
+        this.prepareError.set(
+          hasDrivers
+            ? 'Selectionnez un livreur pour une livraison.'
+            : 'Aucun livreur defini. Ajoutez-en dans Gestion > Livreurs ou utilisez un autre canal.'
+        );
+        return;
+      }
       const order = await this.pos.prepareOrder();
       if (order) {
         await this.receiptService.printKitchenTicket(order);

@@ -1,0 +1,184 @@
+<section class="page">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Service des commandes</h1>
+      <p class="page-subtitle">
+        Gerer les commandes en cours par table et par livraison.
+      </p>
+    </div>
+    <div class="page-actions">
+      <button type="button" class="ghost-button" (click)="refresh()">Actualiser</button>
+    </div>
+  </header>
+
+  <nav class="tabs" role="tablist">
+    <button
+      type="button"
+      role="tab"
+      class="tab-button"
+      [class.active]="activeTab() === 'tables'"
+      (click)="setTab('tables')"
+    >
+      <span>Tables</span>
+      <strong>{{ tablesWithOrders().reduce((sum, row) => sum + row.openPreparedOrders.length, 0) }}</strong>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="tab-button"
+      [class.active]="activeTab() === 'deliveries'"
+      (click)="setTab('deliveries')"
+    >
+      <span>Livraisons</span>
+      <strong>
+        {{ deliveriesByDriver().reduce((sum, row) => sum + row.orders.length, 0) }}
+      </strong>
+    </button>
+    <button
+      type="button"
+      role="tab"
+      class="tab-button"
+      disabled
+      title="Les commandes a emporter figurent dans Historique / Caisse"
+    >
+      <span>A emporter</span>
+      <strong>{{ takeawayOrders().length }}</strong>
+    </button>
+  </nav>
+
+  <!-- TABLES VIEW -->
+  <div class="tab-pane" *ngIf="activeTab() === 'tables'">
+    <ng-container *ngIf="floorTables().length === 0; else tablesGrid">
+      <div class="empty-hero">
+        <h3>Aucune table cree.</h3>
+        <p>
+          Ajoutez des tables dans
+          <strong>Gestion &rarr; Tables</strong> (PIN 281998).
+        </p>
+      </div>
+    </ng-container>
+
+    <ng-template #tablesGrid>
+      <div class="tables-grid">
+        <ng-container *ngFor="let row of tablesWithOrders()">
+          <article
+            class="table-card"
+            [class.has-open]="row.openPreparedOrders.length > 0"
+            [class.occupied-by-paid]="row.openPreparedOrders.length === 0 && row.paidOrders.length > 0"
+          >
+            <header class="table-card-header">
+              <div>
+                <p class="table-number">Table {{ row.table.number }}</p>
+                <p class="table-meta">
+                  {{ row.table.zone || 'Zone non definie' }} &middot; {{ row.table.capacity }} pax
+                </p>
+              </div>
+              <span
+                class="count-pill"
+                [class.open]="row.openPreparedOrders.length > 0"
+                [class.clean]="row.openPreparedOrders.length === 0 && row.paidOrders.length === 0"
+              >
+                {{ row.openPreparedOrders.length > 0 ? row.openPreparedOrders.length + ' en cours' :
+                   (row.paidOrders.length > 0 ? row.paidOrders.length + ' reglee(s)' : 'Libre') }}
+              </span>
+            </header>
+
+            <div class="orders-list" *ngIf="row.openPreparedOrders.length > 0">
+              <div
+                class="order-row"
+                *ngFor="let order of row.openPreparedOrders"
+              >
+                <div class="order-main">
+                  <div class="order-id">
+                    <span class="mono">{{ order.orderNumber }}</span>
+                    <span class="order-channel">Sur place</span>
+                  </div>
+                  <div class="order-lines">
+                    {{ order.lineCount }} article{{ order.lineCount > 1 ? 's' : '' }} &middot;
+                    <span class="mono">{{ totalOf(order) }}</span>
+                  </div>
+                </div>
+                <div class="order-actions">
+                  <button type="button" class="ghost-button" (click)="reopenOrder(order.id)">
+                    Modifier / Payer
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <p class="table-empty-hint" *ngIf="row.openPreparedOrders.length === 0 && row.paidOrders.length === 0">
+              Aucune commande en cours sur cette table.
+            </p>
+          </article>
+        </ng-container>
+      </div>
+    </ng-template>
+  </div>
+
+  <!-- DELIVERIES VIEW -->
+  <div class="tab-pane" *ngIf="activeTab() === 'deliveries'">
+    <ng-container *ngIf="deliveriesByDriver().length === 0; else deliveriesPanel">
+      <div class="empty-hero">
+        <h3>Aucune livraison en cours.</h3>
+        <p>
+          Creez des livreurs dans
+          <strong>Gestion &rarr; Livreurs</strong>, puis creez une commande en caisse avec le canal
+          "Livraison".
+        </p>
+      </div>
+    </ng-container>
+
+    <ng-template #deliveriesPanel>
+      <div class="drivers-stack">
+        <section class="driver-group" *ngFor="let bucket of deliveriesByDriver()">
+          <header class="driver-group-header">
+            <div>
+              <p class="driver-title" *ngIf="bucket.driver">
+                <span class="mono">N°{{ bucket.driver.number }}</span>
+                &nbsp;{{ bucket.driver.name }}
+              </p>
+              <p class="driver-title unassigned" *ngIf="!bucket.driver">
+                <span>Sans livreur assigne</span>
+              </p>
+              <p class="driver-meta" *ngIf="bucket.driver">
+                <span *ngIf="bucket.driver.vehicle">{{ bucket.driver.vehicle }}</span>
+                <span *ngIf="bucket.driver.phone" class="mono">&middot; {{ bucket.driver.phone }}</span>
+              </p>
+            </div>
+            <span class="count-pill open" *ngIf="bucket.orders.length > 0">
+              {{ bucket.orders.length }} commande{{ bucket.orders.length > 1 ? 's' : '' }}
+            </span>
+          </header>
+
+          <div class="orders-list" *ngIf="bucket.orders.length > 0">
+            <div class="order-row" *ngFor="let order of bucket.orders">
+              <div class="order-main">
+                <div class="order-id">
+                  <span class="mono">{{ order.orderNumber }}</span>
+                  <span class="order-channel">Livraison</span>
+                </div>
+                <div class="order-lines">
+                  {{ order.lineCount }} article{{ order.lineCount > 1 ? 's' : '' }} &middot;
+                  <span class="mono">{{ totalOf(order) }}</span>
+                </div>
+                <div class="order-lines small" *ngIf="order.customerPhone || order.deliveryAddress">
+                  <span class="mono" *ngIf="order.customerPhone">Tel: {{ order.customerPhone }}</span>
+                  <span *ngIf="order.deliveryAddress">&mdash; {{ order.deliveryAddress }}</span>
+                </div>
+              </div>
+              <div class="order-actions">
+                <button type="button" class="ghost-button" (click)="reopenOrder(order.id)">
+                  Modifier / Payer
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <p class="table-empty-hint" *ngIf="bucket.orders.length === 0">
+            Aucune livraison en cours.
+          </p>
+        </section>
+      </div>
+    </ng-template>
+  </div>
+</section>

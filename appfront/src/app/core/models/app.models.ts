@@ -53,6 +53,8 @@ export interface DashboardSummary {
   branchId: string;
   activeOrders: number;
   revenueToday: number;
+  revenueCashToday: number;
+  revenueCardToday: number;
   localQueueDepth: number;
   lastSuccessfulSyncAt: string;
   operationalNotes: string[];
@@ -121,6 +123,38 @@ export interface QueueEntry extends SyncEventEnvelope {
 export type OrderStatus = 'PREPARED' | 'PAID';
 export type PaymentMethod = 'CASH' | 'CARD' | 'UNPAID';
 export type SalesSummaryRange = 'DAY_START' | 'LAST_REPORT';
+export type OrderChannel = 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON';
+export type ResourceStatus = 'ACTIVE' | 'INACTIVE';
+
+export interface CashOpening {
+  id: string;
+  branchId: string;
+  dayKey: string;
+  amount: number;
+  currency: string;
+  note?: string;
+  operatorName?: string;
+  setAt: string;
+  lastUpdatedAt: string;
+}
+
+export interface FloorTable {
+  id: string;
+  number: string;
+  label: string;
+  zone: string;
+  capacity: number;
+  status: ResourceStatus;
+}
+
+export interface DeliveryDriver {
+  id: string;
+  number: string;
+  name: string;
+  phone: string;
+  vehicle: string;
+  status: ResourceStatus;
+}
 
 export interface CompletedOrder {
   id: string;
@@ -131,6 +165,11 @@ export interface CompletedOrder {
   currency: string;
   paymentMethod: PaymentMethod;
   status: OrderStatus;
+  channel: OrderChannel;
+  tableNumber?: string;
+  livreurId?: string;
+  deliveryAddress?: string;
+  customerPhone?: string;
   lineCount: number;
   lines: PosLine[];
   createdAt: string;

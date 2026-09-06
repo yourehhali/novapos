@@ -50,6 +50,84 @@
     </button>
   </nav>
 
+  <section class="filters-card">
+    <div class="filters-channel">
+      <button
+        type="button"
+        class="chip"
+        [class.active]="filterChannel() === 'ALL'"
+        (click)="setFilterChannel('ALL')"
+      >
+        <span>Tous</span>
+        <strong>{{ filterCounts().all }}</strong>
+      </button>
+      <button
+        type="button"
+        class="chip surplace"
+        [class.active]="filterChannel() === 'SUR_PLACE'"
+        (click)="setFilterChannel('SUR_PLACE')"
+      >
+        <span>Sur place</span>
+        <strong>{{ filterCounts().surPlace }}</strong>
+      </button>
+      <button
+        type="button"
+        class="chip emporter"
+        [class.active]="filterChannel() === 'EMPORTER'"
+        (click)="setFilterChannel('EMPORTER')"
+      >
+        <span>A emporter</span>
+        <strong>{{ filterCounts().emporter }}</strong>
+      </button>
+      <button
+        type="button"
+        class="chip livraison"
+        [class.active]="filterChannel() === 'LIVRAISON'"
+        (click)="setFilterChannel('LIVRAISON')"
+      >
+        <span>Livraison</span>
+        <strong>{{ filterCounts().livraison }}</strong>
+      </button>
+    </div>
+
+    <div class="filters-selects">
+      <label class="filter-field" *ngIf="filterChannel() === 'ALL' || filterChannel() === 'SUR_PLACE'">
+        <span>Table</span>
+        <select
+          [ngModel]="filterTableNumber()"
+          (ngModelChange)="setFilterTableNumber($event)"
+        >
+          <option value="">Toutes les tables</option>
+          <option *ngFor="let t of floorTables()" [value]="t.number">
+            N° {{ t.number }}{{ t.label ? ' - ' + t.label : '' }}
+          </option>
+        </select>
+      </label>
+
+      <label class="filter-field" *ngIf="filterChannel() === 'ALL' || filterChannel() === 'LIVRAISON'">
+        <span>Livreur</span>
+        <select
+          [ngModel]="filterLivreurId()"
+          (ngModelChange)="setFilterLivreurId($event)"
+        >
+          <option value="">Tous les livreurs</option>
+          <option *ngFor="let d of deliveryDrivers()" [value]="d.id">
+            N° {{ d.number }} - {{ d.name }}
+          </option>
+        </select>
+      </label>
+
+      <button
+        type="button"
+        class="chip ghost clear-chip"
+        *ngIf="hasActiveFilters()"
+        (click)="clearFilters()"
+      >
+        Reinitialiser filtres
+      </button>
+    </div>
+  </section>
+
   <div class="orders-grid" *ngIf="paginatedOrders().length; else emptyState">
     <article class="order-card" *ngFor="let order of paginatedOrders()">
       <div class="card-top">
@@ -57,6 +135,10 @@
         <div class="order-head">
           <strong>{{ order.orderNumber }}</strong>
           <span>{{ order.lines.length }} article(s)</span>
+          <span class="channel-badge {{ channelBadgeClass(order) }}">{{ channelLabel(order) }}</span>
+          <span class="driver-line" *ngIf="livreurLabel(order)">{{ livreurLabel(order) }}</span>
+          <span class="muted-small" *ngIf="order.customerPhone">Tel: {{ order.customerPhone }}</span>
+          <span class="muted-small" *ngIf="order.deliveryAddress">Adr: {{ order.deliveryAddress }}</span>
         </div>
         <span class="order-badge" [class.paid]="order.status === 'PAID'">
           {{ statusLabel(order.status) }}
@@ -135,16 +217,27 @@
 
   <ng-template #emptyState>
     <article class="empty-card">
-      <p>Aucune commande dans cet historique.</p>
-      <span>
-        {{ activeTab() === 'PREPARED'
-          ? 'Preparez une commande dans le POS et elle apparaitra ici pour le paiement.'
-          : 'Aucune commande n a encore ete payee aujourd hui.' }}
-      </span>
+      <ng-container *ngIf="hasActiveFilters(); else noFilterEmpty">
+        <p>Aucune commande ne correspond aux filtres selectionnes.</p>
+        <span>
+          Modifiez ou reinitialisez vos filtres pour afficher plus de commandes.
+        </span>
+        <button type="button" class="secondary-button clear-empty" (click)="clearFilters()">
+          Reinitialiser filtres
+        </button>
+      </ng-container>
+      <ng-template #noFilterEmpty>
+        <p>Aucune commande dans cet historique.</p>
+        <span>
+          {{ activeTab() === 'PREPARED'
+            ? 'Preparez une commande dans le POS et elle apparaitra ici pour le paiement.'
+            : 'Aucune commande n a encore ete payee aujourd hui.' }}
+        </span>
+      </ng-template>
     </article>
   </ng-template>
 
-  <nav class="pagination" *ngIf="activeOrders().length > PAGE_SIZE" aria-label="Pagination">
+  <nav class="pagination" *ngIf="filteredActiveOrders().length > PAGE_SIZE" aria-label="Pagination">
     <button
       type="button"
       class="page-button"

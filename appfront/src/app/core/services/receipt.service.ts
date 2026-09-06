@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import {
   BusinessSettings,
   CompletedOrder,
+  DeliveryDriver,
   LogoType,
   PrintSalesSummaryRequest,
   PrinterConfig,
@@ -9,6 +10,7 @@ import {
   PrintTicketRequest,
   PrintTicketResult,
 } from '../models/app.models';
+import { NovaPosDbService } from '../../offline/novapos-db.service';
 import { AppModalService } from './app-modal.service';
 import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS } from './business-settings.service';
 import { DesktopBridgeService } from './desktop-bridge.service';
@@ -21,8 +23,10 @@ export class ReceiptService {
   private readonly appModal = inject(AppModalService);
   private readonly desktopBridge = inject(DesktopBridgeService);
   private readonly businessSettingsService = inject(BusinessSettingsService);
+  private readonly db = inject(NovaPosDbService);
 
   private settingsCache: BusinessSettings | null = null;
+  private driversCache: DeliveryDriver[] | null = null;
 
   async print(order: CompletedOrder): Promise<boolean> {
     return order.status === 'PAID' ? this.printPaymentTicket(order) : this.printKitchenTicket(order);
@@ -67,7 +71,7 @@ export class ReceiptService {
   }
 
   private async printTicket(kind: TicketKind, order: CompletedOrder): Promise<boolean> {
-    const settings = await this.loadSettings();
+    const [settings, drivers] = await Promise.all([this.loadSettings(), this.loadDrivers()]);
     const printer = this.resolvePrinterFromSettings(kind, settings);
 
     let desktopFailure: string | null = null;
@@ -83,7 +87,7 @@ export class ReceiptService {
       }
     }
 
-    const browserResult = this.printViaIframe(this.buildTicketHtml(kind, order, printer, settings));
+    const browserResult = this.printViaIframe(this.buildTicketHtml(kind, order, printer, settings, drivers));
     if (browserResult.success) return true;
 
     const ticketLabel = kind === 'KITCHEN' ? 'le ticket cuisine' : 'le ticket de paiement';
@@ -105,8 +109,47 @@ export class ReceiptService {
     return this.settingsCache!;
   }
 
+  private async loadDrivers(): Promise<DeliveryDriver[]> {
+    if (this.driversCache) return this.driversCache;
+    try {
+      this.driversCache = await this.db.deliveryDrivers.toArray();
+    } catch {
+      this.driversCache = [];
+    }
+    return this.driversCache!;
+  }
+
   invalidateSettingsCache(): void {
     this.settingsCache = null;
+    this.driversCache = null;
+  }
+
+  private formatChannel(order: CompletedOrder, drivers: DeliveryDriver[]): string[] {
+    const lines: string[] = [];
+    const channel =
+      order.channel === 'EMPORTER' || order.channel === 'LIVRAISON' || order.channel === 'SUR_PLACE'
+        ? order.channel
+        : 'SUR_PLACE';
+    switch (channel) {
+      case 'SUR_PLACE':
+        lines.push(`Canal: Sur place`);
+        if (order.tableNumber) lines.push(`Table: ${order.tableNumber}`);
+        break;
+      case 'EMPORTER':
+        lines.push(`Canal: A emporter`);
+        break;
+      case 'LIVRAISON':
+        lines.push('Canal: Livraison');
+        if (order.livreurId) {
+          const driver = drivers.find((d) => d.id === order.livreurId);
+          const label = driver ? `N°${driver.number} - ${driver.name}` : order.livreurId;
+          lines.push(`Livreur: ${label}`);
+        }
+        break;
+    }
+    if (order.customerPhone) lines.push(`Tel: ${order.customerPhone}`);
+    if (order.deliveryAddress) lines.push(`Adresse: ${order.deliveryAddress}`);
+    return lines;
   }
 
   private resolvePrinterFromSettings(kind: TicketKind, settings: BusinessSettings): PrinterConfig {
@@ -192,6 +235,7 @@ export class ReceiptService {
     order: CompletedOrder,
     printer: PrinterConfig | undefined,
     settings: BusinessSettings,
+    drivers: DeliveryDriver[] = [],
   ): string {
     const paperWidthMm = printer?.paperWidthMm ?? settings.receiptPaperWidthMm ?? 80;
     const pageHeightMm = this.estimateTicketHeight(kind, order, printer);
@@ -222,6 +266,8 @@ export class ReceiptService {
     const heading = this.renderHeading(settings, kind);
     const businessBlock = this.renderBusinessInfo(settings);
     const footer = this.renderFooter(settings);
+    const channelLines = this.formatChannel(order, drivers);
+    const cashierLine = order.cashierName ? `<div>Caissier: ${this.escapeHtml(order.cashierName)}</div>` : '';
 
     return `
       <!doctype html>
@@ -264,6 +310,8 @@ export class ReceiptService {
               ${heading}
               <div class="meta">
                 <div>${this.escapeHtml(order.orderNumber)}</div>
+                ${channelLines.map((l) => `<div>${this.escapeHtml(l)}</div>`).join('')}
+                ${cashierLine}
                 <div>${kind === 'KITCHEN' ? 'Prepare' : 'Paye'} ${this.escapeHtml(printedAt)}</div>
               </div>
             </div>

@@ -14,6 +14,104 @@
         <button type="button" class="cancel-edit-button" (click)="pos.clearCart()">Annuler</button>
       </div>
 
+      <div class="channel-section">
+        <p class="eyebrow channel-eyebrow">Type de commande</p>
+        <div class="channel-row">
+          <button
+            type="button"
+            class="channel-pill"
+            [class.active]="pos.channel() === 'SUR_PLACE'"
+            (click)="setChannel('SUR_PLACE')"
+          >
+            Sur place
+          </button>
+          <button
+            type="button"
+            class="channel-pill"
+            [class.active]="pos.channel() === 'EMPORTER'"
+            (click)="setChannel('EMPORTER')"
+          >
+            A emporter
+          </button>
+          <button
+            type="button"
+            class="channel-pill"
+            [class.active]="pos.channel() === 'LIVRAISON'"
+            (click)="setChannel('LIVRAISON')"
+          >
+            Livraison
+          </button>
+        </div>
+
+        <div class="channel-context" *ngIf="pos.channel() === 'SUR_PLACE'">
+          <label>
+            <span>Table</span>
+            <select
+              [ngModel]="pos.selectedTableNumber()"
+              (ngModelChange)="setSelectedTableNumber($event)"
+            >
+              <option value="">-- Selectionnez une table --</option>
+              <ng-container *ngFor="let t of floorTables()">
+                <option
+                  *ngIf="t.status === 'ACTIVE'"
+                  [ngValue]="t.number"
+                >
+                  Table {{ t.number }} &middot; {{ t.label || (t.zone || 'Salle') }} &middot; {{ t.capacity }} pax
+                </option>
+              </ng-container>
+            </select>
+          </label>
+        </div>
+
+        <div class="channel-context" *ngIf="pos.channel() === 'LIVRAISON'">
+          <label>
+            <span>Livreur *</span>
+            <select
+              [ngModel]="pos.selectedLivreurId()"
+              (ngModelChange)="setSelectedLivreurId($event)"
+            >
+              <option value="">-- Selectionnez un livreur --</option>
+              <option *ngFor="let d of deliveryDrivers()" [ngValue]="d.id">
+                N°{{ d.number }} &middot; {{ d.name }}
+                <ng-container *ngIf="d.vehicle"> ({{ d.vehicle }})</ng-container>
+              </option>
+            </select>
+          </label>
+          <label>
+            <span>Telephone client (optionnel)</span>
+            <input
+              type="text"
+              placeholder="Ex: +212 600 000 000"
+              [ngModel]="pos.customerPhone()"
+              (ngModelChange)="setCustomerPhone($event)"
+            />
+          </label>
+          <label>
+            <span>Adresse de livraison (optionnel)</span>
+            <input
+              type="text"
+              placeholder="Ex: 12 rue de la Gare, Maarif, Casablanca"
+              [ngModel]="pos.deliveryAddress()"
+              (ngModelChange)="setDeliveryAddress($event)"
+            />
+          </label>
+        </div>
+
+        <div class="channel-context" *ngIf="pos.channel() === 'EMPORTER'">
+          <label>
+            <span>Telephone client (optionnel)</span>
+            <input
+              type="text"
+              placeholder="Ex: +212 600 000 000"
+              [ngModel]="pos.customerPhone()"
+              (ngModelChange)="setCustomerPhone($event)"
+            />
+          </label>
+        </div>
+      </div>
+
+      <div class="prepare-error" *ngIf="prepareError()">{{ prepareError() }}</div>
+
       <div class="cart-list" *ngIf="pos.cart().length; else emptyCart">
         <div class="cart-item" *ngFor="let line of pos.cart()">
           <div class="cart-meta">

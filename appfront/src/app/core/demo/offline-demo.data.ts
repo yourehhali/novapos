@@ -373,6 +373,8 @@ export function getOfflineDemoDashboard(branchId: string): DashboardSummary | nu
     branchId: branch.branchId,
     activeOrders: branch.branchId === 'branch-rabat' ? 6 : 12,
     revenueToday: 4870,
+    revenueCashToday: 3260,
+    revenueCardToday: 1610,
     localQueueDepth: 0,
     lastSuccessfulSyncAt: 'Mode demo local',
     operationalNotes: [

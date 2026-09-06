@@ -65,6 +65,26 @@
         type="button"
         role="tab"
         class="tab-button"
+        [class.active]="activeTab() === 'tables'"
+        (click)="switchTab('tables')"
+      >
+        <span>Tables</span>
+        <strong>{{ floorTables().length }}</strong>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-button"
+        [class.active]="activeTab() === 'drivers'"
+        (click)="switchTab('drivers')"
+      >
+        <span>Livreurs</span>
+        <strong>{{ deliveryDrivers().length }}</strong>
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="tab-button"
         [class.active]="activeTab() === 'settings'"
         (click)="switchTab('settings')"
       >
@@ -257,6 +277,206 @@
             <tr *ngIf="categories().length === 0">
               <td colspan="4" class="empty-row">
                 Aucune categorie. Cliquez sur "+ Nouvelle categorie" pour commencer.
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TABLES TAB -->
+    <div class="tab-pane" *ngIf="activeTab() === 'tables'">
+      <div class="toolbar">
+        <div class="toolbar-left"></div>
+        <button type="button" class="primary-button" (click)="createFloorTable()">+ Nouvelle table</button>
+      </div>
+
+      <div class="form-card" *ngIf="editingFloorTable() as t">
+        <p class="form-eyebrow">{{ isNewFloorTable(t) ? 'Nouvelle table' : 'Modifier table' }}</p>
+
+        <div class="form-error" *ngIf="saveError()">{{ saveError() }}</div>
+
+        <div class="form-grid">
+          <label>
+            <span>Numero table *</span>
+            <input
+              type="text"
+              [ngModel]="t.number"
+              (ngModelChange)="setTableField('number', $event)"
+              placeholder="Ex: 1, 2, 12, B3"
+            />
+          </label>
+          <label>
+            <span>Libelle (optionnel)</span>
+            <input
+              type="text"
+              [ngModel]="t.label"
+              (ngModelChange)="setTableField('label', $event)"
+              placeholder="Ex: Terrasse 1"
+            />
+          </label>
+          <label>
+            <span>Zone</span>
+            <input
+              type="text"
+              [ngModel]="t.zone"
+              (ngModelChange)="setTableField('zone', $event)"
+              placeholder="Ex: Salle, Terrasse, Rooftop"
+            />
+          </label>
+          <label>
+            <span>Capacite (places)</span>
+            <input
+              type="number"
+              min="1"
+              [ngModel]="t.capacity"
+              (ngModelChange)="setTableCapacity($event)"
+            />
+          </label>
+          <label>
+            <span>Etat</span>
+            <select [ngModel]="t.status" (ngModelChange)="setTableStatus($event)">
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="secondary-button" (click)="cancelFloorTable()">Annuler</button>
+          <button type="button" class="primary-button" (click)="saveFloorTable()">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 96px;">Numero</th>
+              <th>Libelle</th>
+              <th>Zone</th>
+              <th style="width: 90px;">Places</th>
+              <th style="width: 100px;">Etat</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="floorTables().length === 0">
+              <td colspan="6" class="empty-row">Aucune table creee pour le moment.</td>
+            </tr>
+            <tr *ngFor="let t of floorTables()">
+              <td class="mono">N° {{ t.number }}</td>
+              <td>{{ t.label || '-' }}</td>
+              <td>{{ t.zone || '-' }}</td>
+              <td class="num">{{ t.capacity || '-' }}</td>
+              <td>
+                <span class="status-pill" [class.active]="t.status === 'ACTIVE'" [class.inactive]="t.status === 'INACTIVE'">
+                  {{ t.status === 'ACTIVE' ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button type="button" class="row-link" (click)="editFloorTable(t)">Modifier</button>
+                <button type="button" class="row-link danger" (click)="deleteFloorTable(t)">Supprimer</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LIVREURS / DRIVERS TAB -->
+    <div class="tab-pane" *ngIf="activeTab() === 'drivers'">
+      <div class="toolbar">
+        <div class="toolbar-left"></div>
+        <button type="button" class="primary-button" (click)="createDeliveryDriver()">+ Nouveau livreur</button>
+      </div>
+
+      <div class="form-card" *ngIf="editingDeliveryDriver() as d">
+        <p class="form-eyebrow">{{ isNewDeliveryDriver(d) ? 'Nouveau livreur' : 'Modifier livreur' }}</p>
+
+        <div class="form-error" *ngIf="saveError()">{{ saveError() }}</div>
+
+        <div class="form-grid">
+          <label>
+            <span>Numero livreur *</span>
+            <input
+              type="text"
+              [ngModel]="d.number"
+              (ngModelChange)="setDriverField('number', $event)"
+              placeholder="Ex: 1, 2, 7"
+            />
+          </label>
+          <label>
+            <span>Nom complet *</span>
+            <input
+              type="text"
+              [ngModel]="d.name"
+              (ngModelChange)="setDriverField('name', $event)"
+              placeholder="Ex: Ahmed Benali"
+            />
+          </label>
+          <label>
+            <span>Telephone</span>
+            <input
+              type="text"
+              [ngModel]="d.phone"
+              (ngModelChange)="setDriverField('phone', $event)"
+              placeholder="Ex: +212 600 000 000"
+            />
+          </label>
+          <label>
+            <span>Vehicule</span>
+            <input
+              type="text"
+              [ngModel]="d.vehicle"
+              (ngModelChange)="setDriverField('vehicle', $event)"
+              placeholder="Ex: Moto, Velo, Camionnette"
+            />
+          </label>
+          <label>
+            <span>Etat</span>
+            <select [ngModel]="d.status" (ngModelChange)="setDriverStatus($event)">
+              <option value="ACTIVE">Actif</option>
+              <option value="INACTIVE">Inactif</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="form-actions">
+          <button type="button" class="secondary-button" (click)="cancelDeliveryDriver()">Annuler</button>
+          <button type="button" class="primary-button" (click)="saveDeliveryDriver()">Enregistrer</button>
+        </div>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th style="width: 100px;">Numero</th>
+              <th>Nom</th>
+              <th>Telephone</th>
+              <th>Vehicule</th>
+              <th style="width: 100px;">Etat</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngIf="deliveryDrivers().length === 0">
+              <td colspan="6" class="empty-row">Aucun livreur cree pour le moment.</td>
+            </tr>
+            <tr *ngFor="let d of deliveryDrivers()">
+              <td class="mono">N° {{ d.number }}</td>
+              <td>{{ d.name }}</td>
+              <td class="mono">{{ d.phone || '-' }}</td>
+              <td>{{ d.vehicle || '-' }}</td>
+              <td>
+                <span class="status-pill" [class.active]="d.status === 'ACTIVE'" [class.inactive]="d.status === 'INACTIVE'">
+                  {{ d.status === 'ACTIVE' ? 'Actif' : 'Inactif' }}
+                </span>
+              </td>
+              <td class="actions-cell">
+                <button type="button" class="row-link" (click)="editDeliveryDriver(d)">Modifier</button>
+                <button type="button" class="row-link danger" (click)="deleteDeliveryDriver(d)">Supprimer</button>
               </td>
             </tr>
           </tbody>

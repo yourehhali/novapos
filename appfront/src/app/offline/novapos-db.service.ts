@@ -3,9 +3,12 @@ import Dexie, { Table } from 'dexie';
 import {
   BootstrapSession,
   BusinessSettings,
+  CashOpening,
   Category,
   CompletedOrder,
   DashboardSummary,
+  DeliveryDriver,
+  FloorTable,
   PrinterConfig,
   Product,
   QueueEntry,
@@ -36,6 +39,9 @@ export class NovaPosDbService extends Dexie {
   syncCursors!: Table<{ id: string; cursor: string }, string>;
   reportPrintStates!: Table<ReportPrintState, string>;
   businessSettings!: Table<BusinessSettings, 'current'>;
+  floorTables!: Table<FloorTable, string>;
+  deliveryDrivers!: Table<DeliveryDriver, string>;
+  cashOpenings!: Table<CashOpening, string>;
 
   constructor() {
     super('NovaPosDb');
@@ -77,6 +83,39 @@ export class NovaPosDbService extends Dexie {
       syncCursors: 'id',
       reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
       businessSettings: 'id',
+    });
+
+    this.version(4).stores({
+      sessionContext: 'id',
+      bootstrapSessions: 'branchId',
+      products: 'id, categoryId, name',
+      categories: 'id, name',
+      printers: 'id, target',
+      dashboard: 'branchId',
+      eventQueue: 'eventUuid, branchId, deviceId, localStatus, deviceSequence',
+      completedOrders: 'id, branchId, createdAt, channel, tableNumber, livreurId',
+      syncCursors: 'id',
+      reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+      businessSettings: 'id',
+      floorTables: 'id, number, zone, status',
+      deliveryDrivers: 'id, number, status',
+    });
+
+    this.version(5).stores({
+      sessionContext: 'id',
+      bootstrapSessions: 'branchId',
+      products: 'id, categoryId, name',
+      categories: 'id, name',
+      printers: 'id, target',
+      dashboard: 'branchId',
+      eventQueue: 'eventUuid, branchId, deviceId, localStatus, deviceSequence',
+      completedOrders: 'id, branchId, createdAt, channel, tableNumber, livreurId',
+      syncCursors: 'id',
+      reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+      businessSettings: 'id',
+      floorTables: 'id, number, zone, status',
+      deliveryDrivers: 'id, number, status',
+      cashOpenings: 'id, branchId, dayKey',
     });
   }
 }

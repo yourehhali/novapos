@@ -200,9 +200,15 @@ export class WorkspaceService {
     const normalizedOrders = orders.map((order) => this.normalizeOrder(order));
     const pendingQueue = queue.filter((entry) => entry.localStatus === 'pending');
     const activeOrders = normalizedOrders.filter((order) => order.status === 'PREPARED').length;
-    const revenueToday = normalizedOrders
+    const paidToday = normalizedOrders
       .filter((order) => order.status === 'PAID')
-      .filter((order) => this.isSameBusinessDay(order.paidAt ?? order.lastUpdatedAt ?? order.createdAt, branch.timezone))
+      .filter((order) => this.isSameBusinessDay(order.paidAt ?? order.lastUpdatedAt ?? order.createdAt, branch.timezone));
+    const revenueToday = paidToday.reduce((sum, order) => sum + order.total, 0);
+    const revenueCashToday = paidToday
+      .filter((order) => order.paymentMethod === 'CASH')
+      .reduce((sum, order) => sum + order.total, 0);
+    const revenueCardToday = paidToday
+      .filter((order) => order.paymentMethod === 'CARD')
       .reduce((sum, order) => sum + order.total, 0);
     const lastSuccessfulSyncAt = baseSummary?.lastSuccessfulSyncAt ?? 'En attente';
 
@@ -219,6 +225,8 @@ export class WorkspaceService {
       branchId,
       activeOrders,
       revenueToday,
+      revenueCashToday,
+      revenueCardToday,
       localQueueDepth: pendingQueue.length,
       lastSuccessfulSyncAt,
       operationalNotes,
