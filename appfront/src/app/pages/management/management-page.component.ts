@@ -54,6 +54,7 @@ export class ManagementPageComponent implements OnInit {
   protected readonly editingFloorTable = signal<FloorTable | null>(null);
   protected readonly editingDeliveryDriver = signal<DeliveryDriver | null>(null);
   protected readonly saveError = signal<string | null>(null);
+  private readonly newProductOriginalSku = signal<string | null>(null);
 
   protected readonly editingSettings = signal<BusinessSettings | null>(null);
   protected readonly saveSettingsError = signal<string | null>(null);
@@ -141,10 +142,90 @@ export class ManagementPageComponent implements OnInit {
 
   // ---- Products (typed form setters) ----
 
+  private shortCodeForCategory(categoryId: string): string {
+    const cat = this.categories().find((c) => c.id === categoryId);
+    const raw = cat?.name?.trim() || 'PROD';
+    const normalized = raw
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s-]/g, '')
+      .replace(/[\s-]+/g, ' ');
+    const tokens = normalized.split(/\s+/).filter(Boolean);
+    if (tokens.length === 1) {
+      const word = tokens[0];
+      return (word.slice(0, 3) || word).padEnd(3, 'X');
+    }
+    return tokens
+      .map((t) => t[0])
+      .slice(0, 4)
+      .join('')
+      .padEnd(3, 'X');
+  }
+
+  private nameStem(name: string): string {
+    const normalized = (name || '')
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toUpperCase()
+      .replace(/[^A-Z0-9\s-]/g, '')
+      .replace(/[\s-]+/g, ' ');
+    const tokens = normalized.split(/\s+/).filter(Boolean);
+    if (tokens.length === 0) return '';
+    if (tokens.length === 1) return tokens[0].slice(0, 6);
+    return tokens.map((t) => t[0]).slice(0, 6).join('');
+  }
+
+  private nextSkuSuffix(base: string, excludeId: string | null): string {
+    const prefix = `${base}-`;
+    let max = 0;
+    for (const p of this.products()) {
+      if (excludeId && p.id === excludeId) continue;
+      if (p.sku.startsWith(prefix)) {
+        const rest = p.sku.slice(prefix.length);
+        const n = parseInt(rest, 10);
+        if (!Number.isNaN(n) && n > max) max = n;
+      }
+    }
+    return String(max + 1).padStart(3, '0');
+  }
+
+  private autoGenerateSku(editing: Product): string {
+    const code = this.shortCodeForCategory(editing.categoryId);
+    const stem = this.nameStem(editing.name);
+    const base = stem ? `${code}-${stem}` : code;
+    const suffix = this.nextSkuSuffix(base, this.isNewProduct(editing) ? null : editing.id);
+    return `${base}-${suffix}`;
+  }
+
   setProductField<K extends keyof Product>(field: K, value: Product[K]): void {
     const current = this.editingProduct();
     if (!current) return;
-    this.editingProduct.set({ ...current, [field]: value });
+    const isNew = this.isNewProduct(current);
+    const next = { ...current, [field]: value };
+
+    if (isNew && (field === 'name' || field === 'categoryId')) {
+      const originalSku = this.newProductOriginalSku();
+      const manuallyEdited = originalSku === null;
+      const currentMatchesAuto =
+        current.sku === '' ||
+        (originalSku !== null && current.sku === originalSku);
+
+      if (!manuallyEdited && currentMatchesAuto) {
+        const draft = field === 'name'
+          ? { ...next, categoryId: current.categoryId, name: value as string }
+          : { ...next, categoryId: value as string, name: current.name };
+        const newSku = this.autoGenerateSku(draft as Product);
+        next.sku = newSku;
+        this.newProductOriginalSku.set(newSku);
+      }
+    }
+
+    if (isNew && field === 'sku') {
+      this.newProductOriginalSku.set(null);
+    }
+
+    this.editingProduct.set(next as Product);
   }
 
   setProductPrice(value: string | number): void {
@@ -160,7 +241,7 @@ export class ManagementPageComponent implements OnInit {
   newProduct(): void {
     this.saveError.set(null);
     const firstCat = this.categories()[0];
-    this.editingProduct.set({
+    const fresh: Product = {
       id: `prod-new-${crypto.randomUUID().slice(0, 6)}`,
       name: '',
       categoryId: firstCat?.id ?? '',
@@ -168,16 +249,22 @@ export class ManagementPageComponent implements OnInit {
       currency: 'DH',
       sku: '',
       available: true,
-    });
+    };
+    const initialSku = this.autoGenerateSku(fresh);
+    fresh.sku = initialSku;
+    this.newProductOriginalSku.set(initialSku);
+    this.editingProduct.set(fresh);
   }
 
   editProduct(product: Product): void {
     this.saveError.set(null);
+    this.newProductOriginalSku.set(null);
     this.editingProduct.set({ ...product });
   }
 
   cancelProduct(): void {
     this.saveError.set(null);
+    this.newProductOriginalSku.set(null);
     this.editingProduct.set(null);
   }
 
@@ -197,10 +284,14 @@ export class ManagementPageComponent implements OnInit {
       this.saveError.set('Le prix doit etre un nombre positif.');
       return;
     }
+    const finalSku = (prod.sku || '').trim() || this.autoGenerateSku(prod);
+    const toSave: Product = { ...prod, sku: finalSku };
     try {
-      await this.db.products.put(prod);
+      await this.db.products.put(toSave);
       this.editingProduct.set(null);
+      this.newProductOriginalSku.set(null);
       this.saveError.set(null);
+      this.workspaceService.invalidateAllCachesAndEmit('catalog');
       await this.refreshProducts();
     } catch (err: unknown) {
       this.saveError.set(`Erreur d enregistrement : ${(err as Error)?.message ?? String(err)}`);
@@ -210,6 +301,7 @@ export class ManagementPageComponent implements OnInit {
   async deleteProduct(product: Product): Promise<void> {
     if (!confirm(`Supprimer l article "${product.name}" ?`)) return;
     await this.db.products.delete(product.id);
+    this.workspaceService.invalidateAllCachesAndEmit('catalog');
     await this.refreshProducts();
   }
 
@@ -256,6 +348,7 @@ export class ManagementPageComponent implements OnInit {
       await this.db.categories.put(cat);
       this.editingCategory.set(null);
       this.saveError.set(null);
+      this.workspaceService.invalidateAllCachesAndEmit('catalog');
       await this.refreshCategories();
     } catch (err: unknown) {
       this.saveError.set(`Erreur d enregistrement : ${(err as Error)?.message ?? String(err)}`);
@@ -272,6 +365,7 @@ export class ManagementPageComponent implements OnInit {
       await this.db.products.where('categoryId').equals(category.id).delete();
       await this.db.categories.delete(category.id);
     });
+    this.workspaceService.invalidateAllCachesAndEmit('catalog');
     await this.refreshAll();
   }
 
@@ -331,6 +425,7 @@ export class ManagementPageComponent implements OnInit {
       if (t.label.trim() === '') t.label = `Table ${t.number.trim()}`;
       await this.posService.saveFloorTable(t);
       this.editingFloorTable.set(null);
+      this.workspaceService.emitTablesChanged();
       await this.refreshFloorTables();
     } catch (err: unknown) {
       this.saveError.set(`Echec d enregistrement : ${(err as Error)?.message ?? String(err)}`);
@@ -341,6 +436,7 @@ export class ManagementPageComponent implements OnInit {
     if (!confirm(`Supprimer la table "${t.label || t.number}" ?`)) return;
     try {
       await this.posService.deleteFloorTable(t.id);
+      this.workspaceService.emitTablesChanged();
       await this.refreshFloorTables();
     } catch (err: unknown) {
       this.saveError.set(`Echec suppression : ${(err as Error)?.message ?? String(err)}`);
@@ -405,6 +501,7 @@ export class ManagementPageComponent implements OnInit {
     try {
       await this.posService.saveDeliveryDriver(d);
       this.editingDeliveryDriver.set(null);
+      this.workspaceService.emitDriversChanged();
       await this.refreshDeliveryDrivers();
     } catch (err: unknown) {
       this.saveError.set(`Echec d enregistrement : ${(err as Error)?.message ?? String(err)}`);
@@ -415,6 +512,7 @@ export class ManagementPageComponent implements OnInit {
     if (!confirm(`Supprimer le livreur "${d.name || d.number}" ?`)) return;
     try {
       await this.posService.deleteDeliveryDriver(d.id);
+      this.workspaceService.emitDriversChanged();
       await this.refreshDeliveryDrivers();
     } catch (err: unknown) {
       this.saveError.set(`Echec suppression : ${(err as Error)?.message ?? String(err)}`);
@@ -614,6 +712,7 @@ export class ManagementPageComponent implements OnInit {
     try {
       await this.businessSettingsService.save(settings);
       this.receiptService.invalidateSettingsCache();
+      this.workspaceService.emitBusinessSettingsChanged();
       this.saveSettingsSuccess.set('Parametres enregistres. Les prochains tiquets utiliseront ces valeurs.');
     } catch (err: unknown) {
       this.saveSettingsError.set(`Erreur d enregistrement : ${(err as Error)?.message ?? String(err)}`);

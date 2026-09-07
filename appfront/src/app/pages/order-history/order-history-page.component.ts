@@ -7,6 +7,7 @@ import { ReceiptService } from '../../core/services/receipt.service';
 import { SalesSummaryService } from '../../core/services/sales-summary.service';
 import { SessionService } from '../../core/services/session.service';
 import { SyncService } from '../../core/services/sync.service';
+import { WorkspaceService } from '../../core/services/workspace.service';
 
 const PAGE_SIZE = 12;
 
@@ -23,6 +24,7 @@ export class OrderHistoryPageComponent implements OnInit, OnDestroy {
   private readonly session = inject(SessionService);
   private readonly syncService = inject(SyncService);
   private readonly router = inject(Router);
+  private readonly workspaceService = inject(WorkspaceService);
 
   protected readonly PAGE_SIZE = PAGE_SIZE;
   protected readonly allOrders = signal<CompletedOrder[]>([]);
@@ -96,6 +98,28 @@ export class OrderHistoryPageComponent implements OnInit, OnDestroy {
           await this.reloadAll();
         }
       });
+
+    this.workspaceService.tablesChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => void this.reloadTablesAndKeepFilters());
+    this.workspaceService.driversChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => void this.reloadDriversAndKeepFilters());
+    this.workspaceService.catalogChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => void this.reloadAll());
+  }
+
+  private async reloadTablesAndKeepFilters(): Promise<void> {
+    this.floorTables.set(await this.posService.listFloorTables());
+  }
+
+  private async reloadDriversAndKeepFilters(): Promise<void> {
+    this.deliveryDrivers.set(await this.posService.listDeliveryDrivers());
+    const livreur = this.filterLivreurId();
+    if (livreur && !this.deliveryDrivers().some((d) => d.id === livreur)) {
+      this.filterLivreurId.set('');
+    }
   }
 
   ngOnDestroy(): void {

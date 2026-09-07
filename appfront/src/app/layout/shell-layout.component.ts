@@ -1,8 +1,10 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Subject, takeUntil } from 'rxjs';
 import { NetworkService } from '../core/services/network.service';
 import { SessionService } from '../core/services/session.service';
 import { SyncService } from '../core/services/sync.service';
 import { BusinessSettingsService } from '../core/services/business-settings.service';
+import { WorkspaceService } from '../core/services/workspace.service';
 
 @Component({
   selector: 'app-shell-layout',
@@ -333,14 +335,17 @@ import { BusinessSettingsService } from '../core/services/business-settings.serv
   ],
   standalone: false,
 })
-export class ShellLayoutComponent implements OnInit {
+export class ShellLayoutComponent implements OnInit, OnDestroy {
   protected readonly session = inject(SessionService);
   protected readonly network = inject(NetworkService);
   protected readonly sync = inject(SyncService);
   protected readonly businessSettingsService = inject(BusinessSettingsService);
+  protected readonly workspaceService = inject(WorkspaceService);
   protected readonly sidebarCollapsed = signal(this.readSidebarPreference());
   protected readonly storedBusinessName = signal<string | null>(null);
   protected readonly businessName = computed(() => this.storedBusinessName() ?? this.session.user()?.businessName ?? 'Hole Mole');
+  private readonly destroy$ = new Subject<void>();
+
   protected readonly brandMark = computed(() => {
     const name = this.businessName()?.trim() ?? '';
     if (!name) return 'HM';
@@ -358,6 +363,26 @@ export class ShellLayoutComponent implements OnInit {
     } catch {
       // ignore, fall back to session or default
     }
+
+    this.workspaceService.businessSettingsChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(async () => {
+        try {
+          const settings = await this.businessSettingsService.load();
+          if (settings?.businessName?.trim()) {
+            this.storedBusinessName.set(settings.businessName.trim());
+          } else {
+            this.storedBusinessName.set(null);
+          }
+        } catch {
+          // ignore
+        }
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   protected toggleSidebar(): void {

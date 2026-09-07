@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { Category, DeliveryDriver, FloorTable, OrderChannel, Product } from '../../core/models/app.models';
 import { PosService } from '../../core/services/pos.service';
 import { ReceiptService } from '../../core/services/receipt.service';
@@ -11,7 +12,7 @@ import { WorkspaceService } from '../../core/services/workspace.service';
   styleUrls: ['./pos-page.component.scss'],
   standalone: false,
 })
-export class PosPageComponent implements OnInit {
+export class PosPageComponent implements OnInit, OnDestroy {
   private readonly workspaceService = inject(WorkspaceService);
   private readonly receiptService = inject(ReceiptService);
   private readonly syncService = inject(SyncService);
@@ -25,6 +26,7 @@ export class PosPageComponent implements OnInit {
   protected readonly busy = signal(false);
   protected readonly searchTerm = signal('');
   protected readonly prepareError = signal<string | null>(null);
+  private readonly subscriptions = new Subscription();
 
   protected readonly filteredProducts = computed(() => {
     const search = this.searchTerm().trim().toLowerCase();
@@ -41,15 +43,61 @@ export class PosPageComponent implements OnInit {
   });
 
   async ngOnInit(): Promise<void> {
+    await this.refreshAll();
+    this.subscriptions.add(
+      this.workspaceService.catalogChanged$.subscribe(() => {
+        void this.refreshCatalog();
+      }),
+    );
+    this.subscriptions.add(
+      this.workspaceService.tablesChanged$.subscribe(() => {
+        void this.refreshTables();
+      }),
+    );
+    this.subscriptions.add(
+      this.workspaceService.driversChanged$.subscribe(() => {
+        void this.refreshDrivers();
+      }),
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+  }
+
+  private async refreshAll(): Promise<void> {
     const [catalog, tables, drivers] = await Promise.all([
       this.workspaceService.loadCatalog(),
       this.pos.listFloorTables(),
       this.pos.listDeliveryDrivers(),
     ]);
-    this.products.set(catalog.products);
+    this.products.set(catalog.products.filter((p) => p.available !== false));
     this.categories.set(catalog.categories);
     this.floorTables.set(tables);
     this.deliveryDrivers.set(drivers.filter((d) => d.status === 'ACTIVE'));
+  }
+
+  private async refreshCatalog(): Promise<void> {
+    const catalog = await this.workspaceService.loadCatalog();
+    const cat = this.selectedCategory();
+    this.products.set(catalog.products.filter((p) => p.available !== false));
+    this.categories.set(catalog.categories);
+    if (cat !== 'all' && !catalog.categories.some((c) => c.id === cat)) {
+      this.selectedCategory.set('all');
+    }
+  }
+
+  private async refreshTables(): Promise<void> {
+    this.floorTables.set(await this.pos.listFloorTables());
+  }
+
+  private async refreshDrivers(): Promise<void> {
+    const drivers = await this.pos.listDeliveryDrivers();
+    this.deliveryDrivers.set(drivers.filter((d) => d.status === 'ACTIVE'));
+    const livreur = this.pos.selectedLivreurId();
+    if (livreur && !this.deliveryDrivers().some((d) => d.id === livreur)) {
+      this.pos.selectedLivreurId.set('');
+    }
   }
 
   protected setChannel(channel: OrderChannel): void {

@@ -637,6 +637,13 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
           await this.loadData();
         }
       });
+
+    this.workspaceService.catalogChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => void this.loadData());
+    this.workspaceService.businessSettingsChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => void this.loadData());
   }
 
   ngOnDestroy(): void {

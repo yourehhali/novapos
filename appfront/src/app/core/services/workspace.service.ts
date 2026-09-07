@@ -1,17 +1,18 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom, timeout } from 'rxjs';
+import { Subject } from 'rxjs';
 import {
   BusinessSettings,
   CompletedOrder,
   Category,
   DashboardSummary,
   DemoSeedingMode,
+  DeliveryDriver,
+  FloorTable,
   PrinterConfig,
   Product,
   SyncStatus,
 } from '../models/app.models';
 import { NovaPosDbService } from '../../offline/novapos-db.service';
-import { ApiService } from './api.service';
 import { SessionService } from './session.service';
 import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS } from './business-settings.service';
 import {
@@ -19,76 +20,79 @@ import {
   getOfflineDemoDashboard,
   getOfflineDemoPrinters,
   getOfflineDemoSyncStatus,
-  isOfflineDemoToken,
 } from '../demo/offline-demo.data';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
-  private static readonly API_TIMEOUT_MS = 1200;
   private readonly db = inject(NovaPosDbService);
-  private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
   private readonly businessSettings = inject(BusinessSettingsService);
   private catalogCache: { products: Product[]; categories: Category[] } | null = null;
   private printersCache: PrinterConfig[] | null = null;
+  private readonly catalogChangedSource = new Subject<void>();
+  private readonly tablesChangedSource = new Subject<void>();
+  private readonly driversChangedSource = new Subject<void>();
+  private readonly businessSettingsChangedSource = new Subject<void>();
+
+  readonly catalogChanged$ = this.catalogChangedSource.asObservable();
+  readonly tablesChanged$ = this.tablesChangedSource.asObservable();
+  readonly driversChanged$ = this.driversChangedSource.asObservable();
+  readonly businessSettingsChanged$ = this.businessSettingsChangedSource.asObservable();
 
   invalidateAllCaches(): void {
     this.catalogCache = null;
     this.printersCache = null;
   }
 
+  emitCatalogChanged(): void {
+    this.catalogChangedSource.next();
+  }
+
+  emitTablesChanged(): void {
+    this.tablesChangedSource.next();
+  }
+
+  emitDriversChanged(): void {
+    this.driversChangedSource.next();
+  }
+
+  emitBusinessSettingsChanged(): void {
+    this.businessSettingsChangedSource.next();
+  }
+
+  invalidateAllCachesAndEmit(kind: 'catalog' | 'tables' | 'drivers' | 'settings' | 'all' = 'all'): void {
+    if (kind === 'all' || kind === 'catalog') {
+      this.catalogCache = null;
+      this.emitCatalogChanged();
+    }
+    if (kind === 'all' || kind === 'tables') {
+      this.emitTablesChanged();
+    }
+    if (kind === 'all' || kind === 'drivers') {
+      this.emitDriversChanged();
+    }
+    if (kind === 'all' || kind === 'settings') {
+      this.emitBusinessSettingsChanged();
+    }
+  }
+
   async loadCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
-    const token = this.session.accessToken();
-    const shouldForceDemoCatalog = !token || isOfflineDemoToken(token);
-    const cachedCatalog = await this.loadCachedOrDemoCatalog(shouldForceDemoCatalog);
-
-    if (shouldForceDemoCatalog) {
-      return cachedCatalog;
-    }
-
-    if (cachedCatalog.products.length > 0 && cachedCatalog.categories.length > 0) {
-      if (token) {
-        void this.refreshCatalogFromApi(token);
-      }
-      return cachedCatalog;
-    }
-
-    return this.refreshCatalogFromApi(token);
+    return this.loadCachedOrDemoCatalog();
   }
 
   async loadDashboard(): Promise<DashboardSummary | null> {
     const branch = this.session.branch();
-
     if (!branch) {
       return null;
     }
-
-    const computedSummary = await this.loadComputedDashboard(branch.branchId);
-    if (this.session.accessToken() && !isOfflineDemoToken(this.session.accessToken())) {
-      void this.refreshDashboardFromApi(branch.branchId, this.session.accessToken()!);
-    }
-    return computedSummary;
+    return this.loadComputedDashboard(branch.branchId);
   }
 
   async loadPrinters(): Promise<PrinterConfig[]> {
-    const token = this.session.accessToken();
-    const cachedPrinters = await this.loadCachedOrDemoPrinters();
-    if (cachedPrinters.length > 0) {
-      if (token && !isOfflineDemoToken(token)) {
-        void this.refreshPrintersFromApi(token);
-      }
-      return cachedPrinters;
-    }
-
-    if (!token || isOfflineDemoToken(token)) {
-      return cachedPrinters;
-    }
-
-    return this.refreshPrintersFromApi(token);
+    return this.loadCachedOrDemoPrinters();
   }
 
   async loadSyncStatus(): Promise<SyncStatus | null> {
-    const token = this.session.accessToken();
     const branch = this.session.branch();
     if (!branch) {
       return null;
@@ -97,27 +101,15 @@ export class WorkspaceService {
     const localStatus = await this.buildLocalSyncStatus(
       branch.branchId,
       branch.deviceCode,
-      undefined,
     );
 
-    if (!token || isOfflineDemoToken(token)) {
-      return localStatus ?? getOfflineDemoSyncStatus(branch.branchId, branch.deviceCode);
-    }
-
-    void this.refreshSyncStatusFromApi(token, branch.branchId, branch.deviceCode);
-    return localStatus;
+    return localStatus ?? getOfflineDemoSyncStatus(branch.branchId, branch.deviceCode);
   }
 
-  private async loadCachedOrDemoCatalog(
-    forceDemoCatalog = false,
-  ): Promise<{ products: Product[]; categories: Category[] }> {
+  private async loadCachedOrDemoCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
     const settings = this.businessSettings.snapshot() ?? await this.businessSettings.load();
     const seedingMode: DemoSeedingMode = settings?.demoSeedingMode ?? DEFAULT_BUSINESS_SETTINGS.demoSeedingMode;
     const demoCatalog = this.normalizeCatalog(getOfflineDemoCatalog());
-
-    if (forceDemoCatalog && seedingMode === 'DEMO') {
-      return this.persistCatalog(demoCatalog);
-    }
 
     if (this.catalogCache) {
       return this.catalogCache;
@@ -130,11 +122,7 @@ export class WorkspaceService {
 
     if (products.length > 0 && categories.length > 0) {
       const cachedCatalog = this.normalizeCatalog({ products, categories });
-      if (this.hasExpectedCategoryStructure(cachedCatalog, demoCatalog)) {
-        this.catalogCache = cachedCatalog;
-        return this.catalogCache;
-      }
-      if (seedingMode === 'DEMO') {
+      if (!this.hasExpectedCategoryStructure(cachedCatalog, demoCatalog) && seedingMode === 'DEMO') {
         return this.persistCatalog(demoCatalog);
       }
       this.catalogCache = cachedCatalog;
@@ -311,67 +299,9 @@ export class WorkspaceService {
     return demoPrinters;
   }
 
-  private async refreshCatalogFromApi(
-    token: string,
-  ): Promise<{ products: Product[]; categories: Category[] }> {
-    try {
-      const [products, categories] = await Promise.all([
-        firstValueFrom(this.api.getProducts(token).pipe(timeout(WorkspaceService.API_TIMEOUT_MS))),
-        firstValueFrom(this.api.getCategories(token).pipe(timeout(WorkspaceService.API_TIMEOUT_MS))),
-      ]);
-
-      if (products.length === 0 || categories.length === 0) {
-        return this.loadCachedOrDemoCatalog();
-      }
-
-      const normalizedCatalog = this.normalizeCatalog({ products, categories });
-      await this.db.transaction('rw', this.db.products, this.db.categories, async () => {
-        await this.db.products.clear();
-        await this.db.categories.clear();
-        await this.db.products.bulkPut(normalizedCatalog.products);
-        await this.db.categories.bulkPut(normalizedCatalog.categories);
-      });
-
-      this.catalogCache = normalizedCatalog;
-      return this.catalogCache;
-    } catch {
-      return this.loadCachedOrDemoCatalog();
-    }
-  }
-
-  private async refreshDashboardFromApi(token: string, branchId: string): Promise<void> {
-    try {
-      const summary = await firstValueFrom(
-        this.api.getDashboard(token, branchId).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
-      );
-      await this.db.dashboard.put(summary);
-      await this.buildComputedDashboard(branchId, summary);
-    } catch {
-      // Keep the locally computed dashboard when the backend is slow or unavailable.
-    }
-  }
-
-  private async refreshPrintersFromApi(token: string): Promise<PrinterConfig[]> {
-    try {
-      const printers = await firstValueFrom(
-        this.api.getPrinters(token).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
-      );
-      if (printers.length === 0) {
-        return this.loadCachedOrDemoPrinters();
-      }
-
-      await this.db.printers.bulkPut(printers);
-      this.printersCache = printers;
-      return printers;
-    } catch {
-      return this.loadCachedOrDemoPrinters();
-    }
-  }
-
   private async buildLocalSyncStatus(
     branchId: string,
     deviceId: string,
-    remoteStatus?: SyncStatus,
   ): Promise<SyncStatus> {
     const queue = await this.db.eventQueue.where('branchId').equals(branchId).toArray();
     const branchQueue = queue.filter((entry) => entry.deviceId === deviceId);
@@ -382,25 +312,11 @@ export class WorkspaceService {
     return {
       branchId,
       deviceId,
-      acceptedEvents: remoteStatus?.acceptedEvents ?? acknowledgedEvents,
-      duplicateEvents: remoteStatus?.duplicateEvents ?? 0,
+      acceptedEvents: acknowledgedEvents,
+      duplicateEvents: 0,
       pendingConflicts,
-      serverCursor: remoteStatus?.serverCursor ?? lastCursor?.cursor ?? 'LOCAL_ONLY',
+      serverCursor: lastCursor?.cursor ?? 'LOCAL_ONLY',
     };
-  }
-
-  private async refreshSyncStatusFromApi(
-    token: string,
-    branchId: string,
-    deviceId: string,
-  ): Promise<void> {
-    try {
-      await firstValueFrom(
-        this.api.getSyncStatus(token, branchId, deviceId).pipe(timeout(WorkspaceService.API_TIMEOUT_MS)),
-      );
-    } catch {
-      // Keep the local sync view when the API is slow or unavailable.
-    }
   }
 
   private syncStatusKey(branchId: string, deviceId: string): string {

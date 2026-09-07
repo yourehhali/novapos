@@ -1,8 +1,10 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { CompletedOrder, DeliveryDriver, FloorTable } from '../../core/models/app.models';
 import { PosService } from '../../core/services/pos.service';
+import { WorkspaceService } from '../../core/services/workspace.service';
 
 type ServiceTab = 'tables' | 'deliveries';
 
@@ -13,13 +15,15 @@ type ServiceTab = 'tables' | 'deliveries';
   standalone: true,
   imports: [CommonModule, FormsModule],
 })
-export class ServicePageComponent implements OnInit {
+export class ServicePageComponent implements OnInit, OnDestroy {
   private readonly posService = inject(PosService);
+  private readonly workspaceService = inject(WorkspaceService);
 
   protected readonly activeTab = signal<ServiceTab>('tables');
   protected readonly floorTables = signal<FloorTable[]>([]);
   protected readonly deliveryDrivers = signal<DeliveryDriver[]>([]);
   protected readonly allOrders = signal<CompletedOrder[]>([]);
+  private readonly subscriptions = new Subscription();
 
   protected readonly tablesWithOrders = computed(() => {
     const orders = this.allOrders().filter((o) => o.channel === 'SUR_PLACE');
@@ -60,6 +64,19 @@ export class ServicePageComponent implements OnInit {
 
   async ngOnInit(): Promise<void> {
     await this.refresh();
+    this.subscriptions.add(
+      this.workspaceService.tablesChanged$.subscribe(() => void this.refreshTables()),
+    );
+    this.subscriptions.add(
+      this.workspaceService.driversChanged$.subscribe(() => void this.refreshDrivers()),
+    );
+    this.subscriptions.add(
+      this.workspaceService.catalogChanged$.subscribe(() => void this.refresh()),
+    );
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
   }
 
   async refresh(): Promise<void> {
@@ -71,6 +88,14 @@ export class ServicePageComponent implements OnInit {
     this.floorTables.set(tables);
     this.deliveryDrivers.set(drivers);
     this.allOrders.set(orders);
+  }
+
+  private async refreshTables(): Promise<void> {
+    this.floorTables.set(await this.posService.listFloorTables());
+  }
+
+  private async refreshDrivers(): Promise<void> {
+    this.deliveryDrivers.set(await this.posService.listDeliveryDrivers());
   }
 
   setTab(tab: ServiceTab): void {
