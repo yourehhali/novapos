@@ -1,19 +1,19 @@
 <section class="management-page">
   <header class="page-header">
     <div class="page-title">
-      <p class="eyebrow">Administration</p>
-      <h1>Gestion produits & categories</h1>
+      <p class="eyebrow">{{ lang.t('management.administration') }}</p>
+      <h1>{{ lang.t('management.pageTitle') }}</h1>
     </div>
     <div class="page-actions" *ngIf="pinAuthed()">
-      <button type="button" class="secondary-button" (click)="lockScreen()">Verrouiller</button>
+      <button type="button" class="secondary-button" (click)="lockScreen()">{{ lang.t('management.lock') }}</button>
     </div>
   </header>
 
   <!-- PIN gate -->
   <article class="pin-gate" *ngIf="!pinAuthed()">
     <div class="pin-card">
-      <p class="eyebrow">Acces protege</p>
-      <h2>Saisissez le code PIN</h2>
+      <p class="eyebrow">{{ lang.t('management.protectedAccess') }}</p>
+      <h2>{{ lang.t('management.enterPin') }}</h2>
 
       <label class="pin-field">
         <input
@@ -33,7 +33,7 @@
       </div>
 
       <button type="button" class="primary-button" (click)="submitPin()">
-        Acceder a la gestion
+        {{ lang.t('management.accessManagement') }}
       </button>
     </div>
   </article>
@@ -48,7 +48,7 @@
         [class.active]="activeTab() === 'products'"
         (click)="switchTab('products')"
       >
-        <span>Produits</span>
+        <span>{{ lang.t('management.tabProducts') }}</span>
         <strong>{{ products().length }}</strong>
       </button>
       <button
@@ -58,7 +58,7 @@
         [class.active]="activeTab() === 'categories'"
         (click)="switchTab('categories')"
       >
-        <span>Categories</span>
+        <span>{{ lang.t('management.tabCategories') }}</span>
         <strong>{{ categories().length }}</strong>
       </button>
       <button
@@ -68,7 +68,7 @@
         [class.active]="activeTab() === 'tables'"
         (click)="switchTab('tables')"
       >
-        <span>Tables</span>
+        <span>{{ lang.t('management.tabTables') }}</span>
         <strong>{{ floorTables().length }}</strong>
       </button>
       <button
@@ -78,7 +78,7 @@
         [class.active]="activeTab() === 'drivers'"
         (click)="switchTab('drivers')"
       >
-        <span>Livreurs</span>
+        <span>{{ lang.t('management.tabDrivers') }}</span>
         <strong>{{ deliveryDrivers().length }}</strong>
       </button>
       <button
@@ -88,7 +88,7 @@
         [class.active]="activeTab() === 'settings'"
         (click)="switchTab('settings')"
       >
-        <span>Entreprise</span>
+        <span>{{ lang.t('management.tabBusiness') }}</span>
       </button>
     </nav>
 
@@ -97,15 +97,15 @@
       <div class="toolbar">
         <input
           class="search-input"
-          placeholder="Rechercher un produit, SKU ou categorie..."
+          [attr.placeholder]="lang.t('management.searchProductPlaceholder')"
           [ngModel]="productSearch()"
           (ngModelChange)="productSearch.set($event)"
         />
-        <button type="button" class="primary-button" (click)="newProduct()">+ Nouveau produit</button>
+        <button type="button" class="primary-button" (click)="newProduct()">+ {{ lang.t('management.newProduct') }}</button>
       </div>
 
       <div class="form-card" *ngIf="editingProduct() as product">
-        <p class="form-eyebrow">{{ isNewProduct(product) ? 'Nouveau produit' : 'Modifier produit' }}</p>
+        <p class="form-eyebrow">{{ isNewProduct(product) ? lang.t('management.newProduct') : lang.t('management.editProduct') }}</p>
 
         <div class="form-error" *ngIf="saveError()">
           {{ saveError() }}
@@ -113,38 +113,38 @@
 
         <div class="form-grid">
           <label>
-            <span>Nom *</span>
+            <span>{{ lang.t('common.name') }} *</span>
             <input
               type="text"
               [ngModel]="product.name"
               (ngModelChange)="setProductField('name', $event)"
-              placeholder="Ex: Guacamole con Nachos"
+              [attr.placeholder]="lang.t('management.productNamePlaceholder')"
             />
           </label>
 
           <label>
-            <span>SKU *</span>
+            <span>{{ lang.t('common.sku') }} *</span>
             <input
               type="text"
               [ngModel]="product.sku"
               (ngModelChange)="setProductField('sku', $event)"
-              placeholder="Ex: TAP-001"
+              [attr.placeholder]="lang.t('management.skuPlaceholder')"
             />
           </label>
 
           <label>
-            <span>Categorie *</span>
+            <span>{{ lang.t('management.category') }} *</span>
             <select
               [ngModel]="product.categoryId"
               (ngModelChange)="setProductField('categoryId', $event)"
             >
-              <option value="" disabled>Choisir une categorie</option>
+              <option value="" disabled>{{ lang.t('management.chooseCategory') }}</option>
               <option *ngFor="let c of categories()" [value]="c.id">{{ c.name }}</option>
             </select>
           </label>
 
           <label>
-            <span>Prix ({{ product.currency }}) *</span>
+            <span>{{ lang.t('common.price') }} ({{ product.currency }}) *</span>
             <input
               type="number"
               min="0"
@@ -160,13 +160,13 @@
               [checked]="product.available"
               (change)="setProductAvailable($event)"
             />
-            Disponible a la vente
+            {{ lang.t('management.availableForSale') }}
           </label>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="secondary-button" (click)="cancelProduct()">Annuler</button>
-          <button type="button" class="primary-button" (click)="saveProduct()">Enregistrer</button>
+          <button type="button" class="secondary-button" (click)="cancelProduct()">{{ lang.t('common.cancel') }}</button>
+          <button type="button" class="primary-button" (click)="saveProduct()">{{ lang.t('common.save') }}</button>
         </div>
       </div>
 
@@ -174,12 +174,12 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Nom</th>
-              <th>SKU</th>
-              <th>Categorie</th>
-              <th style="text-align: right;">Prix</th>
-              <th>Statut</th>
-              <th style="text-align: right;">Actions</th>
+              <th>{{ lang.t('common.name') }}</th>
+              <th>{{ lang.t('common.sku') }}</th>
+              <th>{{ lang.t('management.category') }}</th>
+              <th style="text-align: right;">{{ lang.t('common.price') }}</th>
+              <th>{{ lang.t('common.status') }}</th>
+              <th style="text-align: right;">{{ lang.t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -192,17 +192,17 @@
               <td class="num">{{ p.price | number: '1.2-2' }} {{ p.currency }}</td>
               <td>
                 <span class="status-pill" [class.ok]="p.available" [class.no]="!p.available">
-                  {{ p.available ? 'Disponible' : 'Desactive' }}
+                  {{ p.available ? lang.t('management.available') : lang.t('management.disabled') }}
                 </span>
               </td>
               <td class="actions-cell">
-                <button type="button" class="row-link" (click)="editProduct(p)">Modifier</button>
-                <button type="button" class="row-link danger" (click)="deleteProduct(p)">Supprimer</button>
+                <button type="button" class="row-link" (click)="editProduct(p)">{{ lang.t('common.edit') }}</button>
+                <button type="button" class="row-link danger" (click)="deleteProduct(p)">{{ lang.t('common.delete') }}</button>
               </td>
             </tr>
             <tr *ngIf="filteredProducts().length === 0">
               <td colspan="6" class="empty-row">
-                Aucun produit. Cliquez sur "+ Nouveau produit" pour commencer.
+                {{ lang.t('management.noProducts') }}
               </td>
             </tr>
           </tbody>
@@ -214,11 +214,11 @@
     <div class="tab-pane" *ngIf="activeTab() === 'categories'">
       <div class="toolbar">
         <div></div>
-        <button type="button" class="primary-button" (click)="newCategory()">+ Nouvelle categorie</button>
+        <button type="button" class="primary-button" (click)="newCategory()">+ {{ lang.t('management.newCategory') }}</button>
       </div>
 
       <div class="form-card" *ngIf="editingCategory() as category">
-        <p class="form-eyebrow">{{ isNewCategory(category) ? 'Nouvelle categorie' : 'Modifier categorie' }}</p>
+        <p class="form-eyebrow">{{ isNewCategory(category) ? lang.t('management.newCategory') : lang.t('management.editCategory') }}</p>
 
         <div class="form-error" *ngIf="saveError()">
           {{ saveError() }}
@@ -226,29 +226,29 @@
 
         <div class="form-grid">
           <label>
-            <span>Nom *</span>
+            <span>{{ lang.t('common.name') }} *</span>
             <input
               type="text"
               [ngModel]="category.name"
               (ngModelChange)="setCategoryField('name', $event)"
-              placeholder="Ex: Tapas"
+              [attr.placeholder]="lang.t('management.categoryNamePlaceholder')"
             />
           </label>
 
           <label>
-            <span>Description</span>
+            <span>{{ lang.t('management.description') }}</span>
             <input
               type="text"
               [ngModel]="category.description"
               (ngModelChange)="setCategoryField('description', $event)"
-              placeholder="Courte description (optionnel)"
+              [attr.placeholder]="lang.t('management.categoryDescPlaceholder')"
             />
           </label>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="secondary-button" (click)="cancelCategory()">Annuler</button>
-          <button type="button" class="primary-button" (click)="saveCategory()">Enregistrer</button>
+          <button type="button" class="secondary-button" (click)="cancelCategory()">{{ lang.t('common.cancel') }}</button>
+          <button type="button" class="primary-button" (click)="saveCategory()">{{ lang.t('common.save') }}</button>
         </div>
       </div>
 
@@ -256,10 +256,10 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Nom</th>
-              <th>Description</th>
-              <th style="text-align: right;">Produits</th>
-              <th style="text-align: right;">Actions</th>
+              <th>{{ lang.t('common.name') }}</th>
+              <th>{{ lang.t('management.description') }}</th>
+              <th style="text-align: right;">{{ lang.t('management.tabProducts') }}</th>
+              <th style="text-align: right;">{{ lang.t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -270,13 +270,13 @@
               <td class="muted">{{ c.description || '-' }}</td>
               <td class="num">{{ productCountForCategory(c.id) }}</td>
               <td class="actions-cell">
-                <button type="button" class="row-link" (click)="editCategory(c)">Modifier</button>
-                <button type="button" class="row-link danger" (click)="deleteCategory(c)">Supprimer</button>
+                <button type="button" class="row-link" (click)="editCategory(c)">{{ lang.t('common.edit') }}</button>
+                <button type="button" class="row-link danger" (click)="deleteCategory(c)">{{ lang.t('common.delete') }}</button>
               </td>
             </tr>
             <tr *ngIf="categories().length === 0">
               <td colspan="4" class="empty-row">
-                Aucune categorie. Cliquez sur "+ Nouvelle categorie" pour commencer.
+                {{ lang.t('management.noCategories') }}
               </td>
             </tr>
           </tbody>
@@ -288,44 +288,44 @@
     <div class="tab-pane" *ngIf="activeTab() === 'tables'">
       <div class="toolbar">
         <div class="toolbar-left"></div>
-        <button type="button" class="primary-button" (click)="createFloorTable()">+ Nouvelle table</button>
+        <button type="button" class="primary-button" (click)="createFloorTable()">+ {{ lang.t('management.newTable') }}</button>
       </div>
 
       <div class="form-card" *ngIf="editingFloorTable() as t">
-        <p class="form-eyebrow">{{ isNewFloorTable(t) ? 'Nouvelle table' : 'Modifier table' }}</p>
+        <p class="form-eyebrow">{{ isNewFloorTable(t) ? lang.t('management.newTable') : lang.t('management.editTable') }}</p>
 
         <div class="form-error" *ngIf="saveError()">{{ saveError() }}</div>
 
         <div class="form-grid">
           <label>
-            <span>Numero table *</span>
+            <span>{{ lang.t('management.tableNumber') }} *</span>
             <input
               type="text"
               [ngModel]="t.number"
               (ngModelChange)="setTableField('number', $event)"
-              placeholder="Ex: 1, 2, 12, B3"
+              [attr.placeholder]="lang.t('management.tableNumberPlaceholder')"
             />
           </label>
           <label>
-            <span>Libelle (optionnel)</span>
+            <span>{{ lang.t('management.labelOptional') }}</span>
             <input
               type="text"
               [ngModel]="t.label"
               (ngModelChange)="setTableField('label', $event)"
-              placeholder="Ex: Terrasse 1"
+              [attr.placeholder]="lang.t('management.tableLabelPlaceholder')"
             />
           </label>
           <label>
-            <span>Zone</span>
+            <span>{{ lang.t('management.zone') }}</span>
             <input
               type="text"
               [ngModel]="t.zone"
               (ngModelChange)="setTableField('zone', $event)"
-              placeholder="Ex: Salle, Terrasse, Rooftop"
+              [attr.placeholder]="lang.t('management.zonePlaceholder')"
             />
           </label>
           <label>
-            <span>Capacite (places)</span>
+            <span>{{ lang.t('management.capacity') }}</span>
             <input
               type="number"
               min="1"
@@ -334,17 +334,17 @@
             />
           </label>
           <label>
-            <span>Etat</span>
+            <span>{{ lang.t('management.state') }}</span>
             <select [ngModel]="t.status" (ngModelChange)="setTableStatus($event)">
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
+              <option value="ACTIVE">{{ lang.t('management.activeF') }}</option>
+              <option value="INACTIVE">{{ lang.t('management.inactiveF') }}</option>
             </select>
           </label>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="secondary-button" (click)="cancelFloorTable()">Annuler</button>
-          <button type="button" class="primary-button" (click)="saveFloorTable()">Enregistrer</button>
+          <button type="button" class="secondary-button" (click)="cancelFloorTable()">{{ lang.t('common.cancel') }}</button>
+          <button type="button" class="primary-button" (click)="saveFloorTable()">{{ lang.t('common.save') }}</button>
         </div>
       </div>
 
@@ -352,17 +352,17 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th style="width: 96px;">Numero</th>
-              <th>Libelle</th>
-              <th>Zone</th>
-              <th style="width: 90px;">Places</th>
-              <th style="width: 100px;">Etat</th>
-              <th style="text-align: right;">Actions</th>
+              <th style="width: 96px;">{{ lang.t('management.number') }}</th>
+              <th>{{ lang.t('management.label') }}</th>
+              <th>{{ lang.t('management.zone') }}</th>
+              <th style="width: 90px;">{{ lang.t('management.places') }}</th>
+              <th style="width: 100px;">{{ lang.t('management.state') }}</th>
+              <th style="text-align: right;">{{ lang.t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngIf="floorTables().length === 0">
-              <td colspan="6" class="empty-row">Aucune table creee pour le moment.</td>
+              <td colspan="6" class="empty-row">{{ lang.t('management.noTables') }}</td>
             </tr>
             <tr *ngFor="let t of floorTables()">
               <td class="mono">N° {{ t.number }}</td>
@@ -371,12 +371,12 @@
               <td class="num">{{ t.capacity || '-' }}</td>
               <td>
                 <span class="status-pill" [class.active]="t.status === 'ACTIVE'" [class.inactive]="t.status === 'INACTIVE'">
-                  {{ t.status === 'ACTIVE' ? 'Active' : 'Inactive' }}
+                  {{ t.status === 'ACTIVE' ? lang.t('management.activeF') : lang.t('management.inactiveF') }}
                 </span>
               </td>
               <td class="actions-cell">
-                <button type="button" class="row-link" (click)="editFloorTable(t)">Modifier</button>
-                <button type="button" class="row-link danger" (click)="deleteFloorTable(t)">Supprimer</button>
+                <button type="button" class="row-link" (click)="editFloorTable(t)">{{ lang.t('common.edit') }}</button>
+                <button type="button" class="row-link danger" (click)="deleteFloorTable(t)">{{ lang.t('common.delete') }}</button>
               </td>
             </tr>
           </tbody>
@@ -388,63 +388,63 @@
     <div class="tab-pane" *ngIf="activeTab() === 'drivers'">
       <div class="toolbar">
         <div class="toolbar-left"></div>
-        <button type="button" class="primary-button" (click)="createDeliveryDriver()">+ Nouveau livreur</button>
+        <button type="button" class="primary-button" (click)="createDeliveryDriver()">+ {{ lang.t('management.newDriver') }}</button>
       </div>
 
       <div class="form-card" *ngIf="editingDeliveryDriver() as d">
-        <p class="form-eyebrow">{{ isNewDeliveryDriver(d) ? 'Nouveau livreur' : 'Modifier livreur' }}</p>
+        <p class="form-eyebrow">{{ isNewDeliveryDriver(d) ? lang.t('management.newDriver') : lang.t('management.editDriver') }}</p>
 
         <div class="form-error" *ngIf="saveError()">{{ saveError() }}</div>
 
         <div class="form-grid">
           <label>
-            <span>Numero livreur *</span>
+            <span>{{ lang.t('management.driverNumber') }} *</span>
             <input
               type="text"
               [ngModel]="d.number"
               (ngModelChange)="setDriverField('number', $event)"
-              placeholder="Ex: 1, 2, 7"
+              [attr.placeholder]="lang.t('management.driverNumberPlaceholder')"
             />
           </label>
           <label>
-            <span>Nom complet *</span>
+            <span>{{ lang.t('management.fullName') }} *</span>
             <input
               type="text"
               [ngModel]="d.name"
               (ngModelChange)="setDriverField('name', $event)"
-              placeholder="Ex: Ahmed Benali"
+              [attr.placeholder]="lang.t('management.driverNamePlaceholder')"
             />
           </label>
           <label>
-            <span>Telephone</span>
+            <span>{{ lang.t('management.phone') }}</span>
             <input
               type="text"
               [ngModel]="d.phone"
               (ngModelChange)="setDriverField('phone', $event)"
-              placeholder="Ex: +212 600 000 000"
+              [attr.placeholder]="lang.t('management.phonePlaceholder')"
             />
           </label>
           <label>
-            <span>Vehicule</span>
+            <span>{{ lang.t('management.vehicle') }}</span>
             <input
               type="text"
               [ngModel]="d.vehicle"
               (ngModelChange)="setDriverField('vehicle', $event)"
-              placeholder="Ex: Moto, Velo, Camionnette"
+              [attr.placeholder]="lang.t('management.vehiclePlaceholder')"
             />
           </label>
           <label>
-            <span>Etat</span>
+            <span>{{ lang.t('management.state') }}</span>
             <select [ngModel]="d.status" (ngModelChange)="setDriverStatus($event)">
-              <option value="ACTIVE">Actif</option>
-              <option value="INACTIVE">Inactif</option>
+              <option value="ACTIVE">{{ lang.t('common.active') }}</option>
+              <option value="INACTIVE">{{ lang.t('common.inactive') }}</option>
             </select>
           </label>
         </div>
 
         <div class="form-actions">
-          <button type="button" class="secondary-button" (click)="cancelDeliveryDriver()">Annuler</button>
-          <button type="button" class="primary-button" (click)="saveDeliveryDriver()">Enregistrer</button>
+          <button type="button" class="secondary-button" (click)="cancelDeliveryDriver()">{{ lang.t('common.cancel') }}</button>
+          <button type="button" class="primary-button" (click)="saveDeliveryDriver()">{{ lang.t('common.save') }}</button>
         </div>
       </div>
 
@@ -452,17 +452,17 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th style="width: 100px;">Numero</th>
-              <th>Nom</th>
-              <th>Telephone</th>
-              <th>Vehicule</th>
-              <th style="width: 100px;">Etat</th>
-              <th style="text-align: right;">Actions</th>
+              <th style="width: 100px;">{{ lang.t('management.number') }}</th>
+              <th>{{ lang.t('common.name') }}</th>
+              <th>{{ lang.t('management.phone') }}</th>
+              <th>{{ lang.t('management.vehicle') }}</th>
+              <th style="width: 100px;">{{ lang.t('management.state') }}</th>
+              <th style="text-align: right;">{{ lang.t('common.actions') }}</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngIf="deliveryDrivers().length === 0">
-              <td colspan="6" class="empty-row">Aucun livreur cree pour le moment.</td>
+              <td colspan="6" class="empty-row">{{ lang.t('management.noDrivers') }}</td>
             </tr>
             <tr *ngFor="let d of deliveryDrivers()">
               <td class="mono">N° {{ d.number }}</td>
@@ -471,12 +471,12 @@
               <td>{{ d.vehicle || '-' }}</td>
               <td>
                 <span class="status-pill" [class.active]="d.status === 'ACTIVE'" [class.inactive]="d.status === 'INACTIVE'">
-                  {{ d.status === 'ACTIVE' ? 'Actif' : 'Inactif' }}
+                  {{ d.status === 'ACTIVE' ? lang.t('common.active') : lang.t('common.inactive') }}
                 </span>
               </td>
               <td class="actions-cell">
-                <button type="button" class="row-link" (click)="editDeliveryDriver(d)">Modifier</button>
-                <button type="button" class="row-link danger" (click)="deleteDeliveryDriver(d)">Supprimer</button>
+                <button type="button" class="row-link" (click)="editDeliveryDriver(d)">{{ lang.t('common.edit') }}</button>
+                <button type="button" class="row-link danger" (click)="deleteDeliveryDriver(d)">{{ lang.t('common.delete') }}</button>
               </td>
             </tr>
           </tbody>
@@ -500,69 +500,69 @@
 
       <!-- Identity block -->
       <div class="settings-block">
-        <p class="block-title">Identite de l entreprise</p>
+        <p class="block-title">{{ lang.t('management.businessIdentity') }}</p>
         <div class="form-grid">
           <label>
-            <span>Nom de l entreprise *</span>
+            <span>{{ lang.t('management.businessName') }} *</span>
             <input
               type="text"
               [ngModel]="s.businessName"
               (ngModelChange)="setSettingsField('businessName', $event)"
-              placeholder="Ex: Hole Mole"
+              [attr.placeholder]="lang.t('management.businessNamePlaceholder')"
             />
           </label>
           <label>
-            <span>Telephone</span>
+            <span>{{ lang.t('management.phone') }}</span>
             <input
               type="text"
               [ngModel]="s.phone"
               (ngModelChange)="setSettingsField('phone', $event)"
-              placeholder="Ex: +212 522 00 00 00"
+              [attr.placeholder]="lang.t('management.businessPhonePlaceholder')"
             />
           </label>
           <label>
-            <span>Adresse ligne 1</span>
+            <span>{{ lang.t('management.addressLine1') }}</span>
             <input
               type="text"
               [ngModel]="s.addressLine1"
               (ngModelChange)="setSettingsField('addressLine1', $event)"
-              placeholder="Ex: 123 avenue Hassan II"
+              [attr.placeholder]="lang.t('management.address1Placeholder')"
             />
           </label>
           <label>
-            <span>Adresse ligne 2</span>
+            <span>{{ lang.t('management.addressLine2') }}</span>
             <input
               type="text"
               [ngModel]="s.addressLine2"
               (ngModelChange)="setSettingsField('addressLine2', $event)"
-              placeholder="Etage, quartier (optionnel)"
+              [attr.placeholder]="lang.t('management.address2Placeholder')"
             />
           </label>
           <label>
-            <span>Libelle impot / taxe</span>
+            <span>{{ lang.t('management.taxLabel') }}</span>
             <input
               type="text"
               [ngModel]="s.taxLabel"
               (ngModelChange)="setSettingsField('taxLabel', $event)"
-              placeholder="Ex: IF, ICE, TVA"
+              [attr.placeholder]="lang.t('management.taxLabelPlaceholder')"
             />
           </label>
           <label>
-            <span>Numero impot / taxe</span>
+            <span>{{ lang.t('management.taxNumber') }}</span>
             <input
               type="text"
               [ngModel]="s.taxNumber"
               (ngModelChange)="setSettingsField('taxNumber', $event)"
-              placeholder="Ex: 123456789"
+              [attr.placeholder]="lang.t('management.taxNumberPlaceholder')"
             />
           </label>
           <label>
-            <span>Devise d affichage</span>
+            <span>{{ lang.t('management.displayCurrency') }}</span>
             <input
               type="text"
               [ngModel]="s.currency"
               (ngModelChange)="setSettingsField('currency', $event)"
-              placeholder="Ex: DH, EUR, $"
+              [attr.placeholder]="lang.t('management.currencyPlaceholder')"
             />
           </label>
         </div>
@@ -570,29 +570,29 @@
 
       <!-- Default block -->
       <div class="settings-block">
-        <p class="block-title">Parametres par defaut (fallback)</p>
-        <p class="block-subtitle">Valeurs globales utilisees si un type de ticket n a pas ses propres parametres.</p>
+        <p class="block-title">{{ lang.t('management.defaultSettings') }}</p>
+        <p class="block-subtitle">{{ lang.t('management.defaultSettingsHelp') }}</p>
         <div class="form-grid">
           <label>
-            <span>Titre par defaut (ticket paiement)</span>
+            <span>{{ lang.t('management.defaultTicketTitle') }}</span>
             <input
               type="text"
               [ngModel]="s.ticketHeading"
               (ngModelChange)="setSettingsField('ticketHeading', $event)"
-              placeholder="Ex: Ticket Commande"
+              [attr.placeholder]="lang.t('management.ticketHeadingPlaceholder')"
             />
           </label>
           <label>
-            <span>Sous-titre par defaut</span>
+            <span>{{ lang.t('management.defaultSubheading') }}</span>
             <input
               type="text"
               [ngModel]="s.ticketSubheading"
               (ngModelChange)="setSettingsField('ticketSubheading', $event)"
-              placeholder="Optionnel - sous le titre"
+              [attr.placeholder]="lang.t('management.subheadingPlaceholder')"
             />
           </label>
           <label>
-            <span>Pied page 1 par defaut</span>
+            <span>{{ lang.t('management.defaultFooter1') }}</span>
             <input
               type="text"
               [ngModel]="s.footerLine1"
@@ -600,7 +600,7 @@
             />
           </label>
           <label>
-            <span>Pied page 2 par defaut</span>
+            <span>{{ lang.t('management.defaultFooter2') }}</span>
             <input
               type="text"
               [ngModel]="s.footerLine2"
@@ -608,7 +608,7 @@
             />
           </label>
           <label style="grid-column: 1 / -1;">
-            <span>Pied page 3 par defaut</span>
+            <span>{{ lang.t('management.defaultFooter3') }}</span>
             <input
               type="text"
               [ngModel]="s.footerLine3"
@@ -616,7 +616,7 @@
             />
           </label>
         </div>
-        <p class="logo-subtitle mt">Logo par defaut:</p>
+        <p class="logo-subtitle mt">{{ lang.t('management.defaultLogo') }}</p>
         <div class="logo-type-row">
           <label class="radio-pill">
             <input
@@ -626,7 +626,7 @@
               [checked]="s.logoType === 'TEXT'"
               (change)="setSettingsLogoType('TEXT')"
             />
-            <span>Texte</span>
+            <span>{{ lang.t('management.logoText') }}</span>
           </label>
           <label class="radio-pill">
             <input
@@ -636,19 +636,19 @@
               [checked]="s.logoType === 'IMAGE'"
               (change)="setSettingsLogoType('IMAGE')"
             />
-            <span>Image</span>
+            <span>{{ lang.t('management.logoImage') }}</span>
           </label>
         </div>
         <div class="logo-config" *ngIf="s.logoType === 'TEXT'">
           <div class="form-grid">
             <label style="grid-column: 1 / -1;">
-              <span>Texte du logo par defaut (court, 4-14 caracteres recommandes)</span>
+              <span>{{ lang.t('management.defaultLogoText') }}</span>
               <input
                 type="text"
                 maxlength="14"
                 [ngModel]="s.logoText"
                 (ngModelChange)="setSettingsField('logoText', $event)"
-                placeholder="Ex: HM"
+                [attr.placeholder]="lang.t('management.logoTextPlaceholder')"
               />
             </label>
           </div>
@@ -659,7 +659,7 @@
         <div class="logo-config" *ngIf="s.logoType === 'IMAGE'">
           <div class="form-grid">
             <label>
-              <span>Choisir une image (PNG/JPG, max 1.5 Mo)</span>
+              <span>{{ lang.t('management.chooseImage') }}</span>
               <input
                 type="file"
                 accept="image/*"
@@ -675,7 +675,7 @@
               alt="logo preview"
             />
             <div *ngIf="!s.logoImageDataUrl" class="logo-preview-empty">
-              Aucune image selectionnee
+              {{ lang.t('management.noImageSelected') }}
             </div>
           </div>
           <button
@@ -684,14 +684,14 @@
             *ngIf="s.logoImageDataUrl"
             (click)="clearLogoImage()"
           >
-            Supprimer l image
+            {{ lang.t('management.removeImage') }}
           </button>
         </div>
       </div>
 
       <!-- Per-kind ticket layouts -->
       <div class="settings-block">
-        <p class="block-title">Mise en page par type de ticket</p>
+        <p class="block-title">{{ lang.t('management.ticketLayout') }}</p>
         <div class="tab-row">
           <button
             type="button"
@@ -699,7 +699,7 @@
             [class.active]="settingsTicketTab() === 'payment'"
             (click)="setSettingsTicketTab('payment')"
           >
-            Ticket paiement
+            {{ lang.t('management.ticketPayment') }}
           </button>
           <button
             type="button"
@@ -707,7 +707,7 @@
             [class.active]="settingsTicketTab() === 'kitchen'"
             (click)="setSettingsTicketTab('kitchen')"
           >
-            Ticket cuisine
+            {{ lang.t('management.ticketKitchen') }}
           </button>
         </div>
 
@@ -719,7 +719,7 @@
                 [checked]="p.showBusinessInfo"
                 (change)="setTicketLayoutField('payment', 'showBusinessInfo', $event.target.checked)"
               />
-              <span>Afficher le bloc entreprise (nom / adresse / tel / taxe)</span>
+              <span>{{ lang.t('management.showBusinessBlock') }}</span>
             </label>
           </div>
           <div class="logo-type-row">
@@ -731,7 +731,7 @@
                 [checked]="p.logoType === 'TEXT'"
                 (change)="setTicketLayoutLogoType('payment', 'TEXT')"
               />
-              <span>Texte</span>
+              <span>{{ lang.t('management.logoText') }}</span>
             </label>
             <label class="radio-pill">
               <input
@@ -741,19 +741,19 @@
                 [checked]="p.logoType === 'IMAGE'"
                 (change)="setTicketLayoutLogoType('payment', 'IMAGE')"
               />
-              <span>Image</span>
+              <span>{{ lang.t('management.logoImage') }}</span>
             </label>
           </div>
           <div class="logo-config" *ngIf="p.logoType === 'TEXT'">
             <div class="form-grid">
               <label style="grid-column: 1 / -1;">
-                <span>Logo texte (4-14 caracteres). Laissez vide pour utiliser le logo par defaut.</span>
+                <span>{{ lang.t('management.paymentLogoTextHelp') }}</span>
                 <input
                   type="text"
                   maxlength="14"
                   [ngModel]="p.logoText"
                   (ngModelChange)="setTicketLayoutField('payment', 'logoText', $event)"
-                  placeholder="Ex: HOLE MOLE"
+                  [attr.placeholder]="lang.t('management.paymentLogoTextPlaceholder')"
                 />
               </label>
             </div>
@@ -764,7 +764,7 @@
           <div class="logo-config" *ngIf="p.logoType === 'IMAGE'">
             <div class="form-grid">
               <label>
-                <span>Image logo paiement (PNG/JPG max 1.5 Mo). Laissez vide pour utiliser le logo par defaut.</span>
+                <span>{{ lang.t('management.paymentLogoImageHelp') }}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -777,10 +777,10 @@
                 *ngIf="p.logoImageDataUrl"
                 class="logo-image-preview"
                 [src]="p.logoImageDataUrl"
-                alt="logo paiement preview"
+                [attr.alt]="lang.t('management.logoPaymentPreviewAlt')"
               />
               <div *ngIf="!p.logoImageDataUrl" class="logo-preview-empty">
-                Aucune image (utilisera le logo par defaut)
+                {{ lang.t('management.noImagePayment') }}
               </div>
             </div>
             <button
@@ -789,21 +789,21 @@
               *ngIf="p.logoImageDataUrl"
               (click)="clearTicketLayoutLogoImage('payment')"
             >
-              Supprimer l image
+              {{ lang.t('management.removeImage') }}
             </button>
           </div>
           <div class="form-grid mt">
             <label>
-              <span>Titre du ticket paiement</span>
+              <span>{{ lang.t('management.paymentTicketTitle') }}</span>
               <input
                 type="text"
                 [ngModel]="p.heading"
                 (ngModelChange)="setTicketLayoutField('payment', 'heading', $event)"
-                placeholder="Ex: Ticket Commande"
+                [attr.placeholder]="lang.t('management.paymentHeadingPlaceholder')"
               />
             </label>
             <label>
-              <span>Sous-titre du ticket paiement</span>
+              <span>{{ lang.t('management.paymentSubtitle') }}</span>
               <input
                 type="text"
                 [ngModel]="p.subheading"
@@ -811,7 +811,7 @@
               />
             </label>
             <label>
-              <span>Pied de page 1</span>
+              <span>{{ lang.t('management.footer1') }}</span>
               <input
                 type="text"
                 [ngModel]="p.footerLine1"
@@ -819,7 +819,7 @@
               />
             </label>
             <label>
-              <span>Pied de page 2</span>
+              <span>{{ lang.t('management.footer2') }}</span>
               <input
                 type="text"
                 [ngModel]="p.footerLine2"
@@ -827,7 +827,7 @@
               />
             </label>
             <label style="grid-column: 1 / -1;">
-              <span>Pied de page 3</span>
+              <span>{{ lang.t('management.footer3') }}</span>
               <input
                 type="text"
                 [ngModel]="p.footerLine3"
@@ -845,7 +845,7 @@
                 [checked]="k.showBusinessInfo"
                 (change)="setTicketLayoutField('kitchen', 'showBusinessInfo', $event.target.checked)"
               />
-              <span>Afficher le bloc entreprise (nom / adresse / tel / taxe)</span>
+              <span>{{ lang.t('management.showBusinessBlock') }}</span>
             </label>
           </div>
           <div class="logo-type-row">
@@ -857,7 +857,7 @@
                 [checked]="k.logoType === 'TEXT'"
                 (change)="setTicketLayoutLogoType('kitchen', 'TEXT')"
               />
-              <span>Texte</span>
+              <span>{{ lang.t('management.logoText') }}</span>
             </label>
             <label class="radio-pill">
               <input
@@ -867,19 +867,19 @@
                 [checked]="k.logoType === 'IMAGE'"
                 (change)="setTicketLayoutLogoType('kitchen', 'IMAGE')"
               />
-              <span>Image</span>
+              <span>{{ lang.t('management.logoImage') }}</span>
             </label>
           </div>
           <div class="logo-config" *ngIf="k.logoType === 'TEXT'">
             <div class="form-grid">
               <label style="grid-column: 1 / -1;">
-                <span>Logo texte cuisine (4-14 caracteres). Laissez vide = pas de logo texte / defaut.</span>
+                <span>{{ lang.t('management.kitchenLogoTextHelp') }}</span>
                 <input
                   type="text"
                   maxlength="14"
                   [ngModel]="k.logoText"
                   (ngModelChange)="setTicketLayoutField('kitchen', 'logoText', $event)"
-                  placeholder="Ex: CUISINE"
+                  [attr.placeholder]="lang.t('management.kitchenLogoTextPlaceholder')"
                 />
               </label>
             </div>
@@ -890,7 +890,7 @@
           <div class="logo-config" *ngIf="k.logoType === 'IMAGE'">
             <div class="form-grid">
               <label>
-                <span>Image logo cuisine (PNG/JPG max 1.5 Mo). Laissez vide pour le logo par defaut.</span>
+                <span>{{ lang.t('management.kitchenLogoImageHelp') }}</span>
                 <input
                   type="file"
                   accept="image/*"
@@ -903,10 +903,10 @@
                 *ngIf="k.logoImageDataUrl"
                 class="logo-image-preview"
                 [src]="k.logoImageDataUrl"
-                alt="logo cuisine preview"
+                [attr.alt]="lang.t('management.logoCuisinePreviewAlt')"
               />
               <div *ngIf="!k.logoImageDataUrl" class="logo-preview-empty">
-                Aucune image (logo par defaut)
+                {{ lang.t('management.noImageKitchen') }}
               </div>
             </div>
             <button
@@ -915,21 +915,21 @@
               *ngIf="k.logoImageDataUrl"
               (click)="clearTicketLayoutLogoImage('kitchen')"
             >
-              Supprimer l image
+              {{ lang.t('management.removeImage') }}
             </button>
           </div>
           <div class="form-grid mt">
             <label>
-              <span>Titre du ticket cuisine</span>
+              <span>{{ lang.t('management.kitchenTicketTitle') }}</span>
               <input
                 type="text"
                 [ngModel]="k.heading"
                 (ngModelChange)="setTicketLayoutField('kitchen', 'heading', $event)"
-                placeholder="Ex: Ticket Cuisine"
+                [attr.placeholder]="lang.t('management.kitchenHeadingPlaceholder')"
               />
             </label>
             <label>
-              <span>Sous-titre du ticket cuisine</span>
+              <span>{{ lang.t('management.kitchenSubtitle') }}</span>
               <input
                 type="text"
                 [ngModel]="k.subheading"
@@ -937,7 +937,7 @@
               />
             </label>
             <label>
-              <span>Pied de page 1</span>
+              <span>{{ lang.t('management.footer1') }}</span>
               <input
                 type="text"
                 [ngModel]="k.footerLine1"
@@ -945,7 +945,7 @@
               />
             </label>
             <label>
-              <span>Pied de page 2</span>
+              <span>{{ lang.t('management.footer2') }}</span>
               <input
                 type="text"
                 [ngModel]="k.footerLine2"
@@ -953,7 +953,7 @@
               />
             </label>
             <label style="grid-column: 1 / -1;">
-              <span>Pied de page 3</span>
+              <span>{{ lang.t('management.footer3') }}</span>
               <input
                 type="text"
                 [ngModel]="k.footerLine3"
@@ -966,47 +966,47 @@
 
       <!-- Printers block -->
       <div class="settings-block">
-        <p class="block-title">Imprimantes</p>
+        <p class="block-title">{{ lang.t('management.printers') }}</p>
         <div class="printers-grid">
           <!-- Receipt printer card -->
           <div class="printer-card">
-            <p class="printer-title">Imprimante paiement (ticket)</p>
+            <p class="printer-title">{{ lang.t('management.paymentPrinter') }}</p>
             <div class="form-grid">
               <label>
-                <span>Nom de l imprimante</span>
+                <span>{{ lang.t('management.printerName') }}</span>
                 <input
                   type="text"
                   [ngModel]="s.receiptPrinterName"
                   (ngModelChange)="setSettingsField('receiptPrinterName', $event)"
-                  placeholder="Ex: TM-T20II Ticket"
+                  [attr.placeholder]="lang.t('management.receiptPrinterNamePlaceholder')"
                 />
               </label>
               <label>
-                <span>Nom de la file / queue (Windows)</span>
+                <span>{{ lang.t('management.queueName') }}</span>
                 <input
                   type="text"
                   [ngModel]="s.receiptQueueName"
                   (ngModelChange)="setSettingsField('receiptQueueName', $event)"
-                  placeholder="Ex: EPSON-TM-T20"
+                  [attr.placeholder]="lang.t('management.receiptQueuePlaceholder')"
                 />
               </label>
               <label>
-                <span>Adresse IP (reseau ESC/POS)</span>
+                <span>{{ lang.t('management.ipAddress') }}</span>
                 <input
                   type="text"
                   [ngModel]="s.receiptPrinterIp"
                   (ngModelChange)="setSettingsField('receiptPrinterIp', $event)"
-                  placeholder="Ex: 192.168.1.12 (vide = impression navigateur)"
+                  [attr.placeholder]="lang.t('management.receiptIpPlaceholder')"
                 />
               </label>
               <label>
-                <span>Largeur papier</span>
+                <span>{{ lang.t('management.paperWidth') }}</span>
                 <select
                   [ngModel]="s.receiptPaperWidthMm"
                   (ngModelChange)="setSettingsReceiptWidth($event)"
                 >
-                  <option [ngValue]="80">80 mm (standard)</option>
-                  <option [ngValue]="58">58 mm (compact)</option>
+                  <option [ngValue]="80">{{ lang.t('management.width80') }}</option>
+                  <option [ngValue]="58">{{ lang.t('management.width58') }}</option>
                 </select>
               </label>
             </div>
@@ -1014,43 +1014,43 @@
 
           <!-- Kitchen printer card -->
           <div class="printer-card">
-            <p class="printer-title">Imprimante cuisine (KOT)</p>
+            <p class="printer-title">{{ lang.t('management.kitchenPrinter') }}</p>
             <div class="form-grid">
               <label>
-                <span>Nom de l imprimante</span>
+                <span>{{ lang.t('management.printerName') }}</span>
                 <input
                   type="text"
                   [ngModel]="s.kitchenPrinterName"
                   (ngModelChange)="setSettingsField('kitchenPrinterName', $event)"
-                  placeholder="Ex: TM-T20II Cuisine"
+                  [attr.placeholder]="lang.t('management.kitchenPrinterNamePlaceholder')"
                 />
               </label>
               <label>
-                <span>Nom de la file / queue (Windows)</span>
+                <span>{{ lang.t('management.queueName') }}</span>
                 <input
                   type="text"
                   [ngModel]="s.kitchenQueueName"
                   (ngModelChange)="setSettingsField('kitchenQueueName', $event)"
-                  placeholder="Ex: EPSON-CUISINE"
+                  [attr.placeholder]="lang.t('management.kitchenQueuePlaceholder')"
                 />
               </label>
               <label>
-                <span>Adresse IP (reseau ESC/POS)</span>
+                <span>{{ lang.t('management.ipAddress') }}</span>
                 <input
                   type="text"
                   [ngModel]="s.kitchenPrinterIp"
                   (ngModelChange)="setSettingsField('kitchenPrinterIp', $event)"
-                  placeholder="Ex: 192.168.1.13 (vide = impression navigateur)"
+                  [attr.placeholder]="lang.t('management.kitchenIpPlaceholder')"
                 />
               </label>
               <label>
-                <span>Largeur papier</span>
+                <span>{{ lang.t('management.paperWidth') }}</span>
                 <select
                   [ngModel]="s.kitchenPaperWidthMm"
                   (ngModelChange)="setSettingsKitchenWidth($event)"
                 >
-                  <option [ngValue]="80">80 mm (standard)</option>
-                  <option [ngValue]="58">58 mm (compact)</option>
+                  <option [ngValue]="80">{{ lang.t('management.width80') }}</option>
+                  <option [ngValue]="58">{{ lang.t('management.width58') }}</option>
                 </select>
               </label>
             </div>
@@ -1059,11 +1059,9 @@
       </div>
 
       <div class="settings-block danger-settings-block">
-        <p class="block-title">Reinitialiser les donnees locales</p>
+        <p class="block-title">{{ lang.t('management.resetLocalData') }}</p>
         <p class="block-subtitle danger-subtitle">
-          Attention : cette operation est definitive et concerne uniquement la caisse locale (hors connexion).
-          Tous les catalogues, commandes, tables, livreurs, ouvertures de caisse et evenements en file
-          seront effaces de IndexedDB.
+          {{ lang.t('management.resetLocalDataWarning') }}
         </p>
         <div class="form-card success-card" *ngIf="clearDataSuccess()">
           <span>{{ clearDataSuccess() }}</span>
@@ -1074,20 +1072,20 @@
             class="secondary-button danger"
             (click)="openClearDataConfirm('BLANK')"
           >
-            Vider TOUT (usine, mode vierge)
+            {{ lang.t('management.wipeAll') }}
           </button>
           <button
             type="button"
             class="secondary-button"
             (click)="openClearDataConfirm('DEMO')"
           >
-            Revenir aux donnees de demonstration
+            {{ lang.t('management.restoreDemo') }}
           </button>
         </div>
       </div>
 
       <div class="form-actions">
-        <button type="button" class="primary-button" (click)="saveSettings()">Enregistrer</button>
+        <button type="button" class="primary-button" (click)="saveSettings()">{{ lang.t('common.save') }}</button>
       </div>
     </div>
   </ng-container>
@@ -1100,19 +1098,19 @@
     <div class="modal-shell" role="dialog" aria-modal="true">
     <div class="modal-shell-header">
       <p class="modal-title">
-        Confirmer la reinitialisation
-        <span class="modal-title-mode">{{ mode === 'BLANK' ? '(vider tout)' : '(revenir demo)' }}</span>
+        {{ lang.t('management.confirmReset') }}
+        <span class="modal-title-mode">{{ mode === 'BLANK' ? lang.t('management.modeWipe') : lang.t('management.modeDemo') }}</span>
       </p>
-      <button type="button" class="modal-close" aria-label="Fermer" (click)="cancelClearData()">×</button>
+      <button type="button" class="modal-close" [attr.aria-label]="lang.t('common.close')" (click)="cancelClearData()">×</button>
     </div>
     <div class="modal-shell-body">
       <p class="danger-lead">
-        Toutes les donnees locales stockees sur cette caisse seront
-        <strong>{{ mode === 'BLANK' ? 'supprimees definitivement' : 'remplacees par les donnees de demonstration' }}</strong>.
+        {{ lang.t('management.resetLeadStart') }}
+        <strong>{{ mode === 'BLANK' ? lang.t('management.wipeStrong') : lang.t('management.demoStrong') }}</strong>.
       </p>
-      <p class="muted">Entrez le PIN de gestion (même que Management) pour confirmer.</p>
+      <p class="muted">{{ lang.t('management.enterPinConfirm') }}</p>
       <label class="pin-field">
-        <span>PIN gestion</span>
+        <span>{{ lang.t('management.pinLabel') }}</span>
         <input
           type="password"
           autocomplete="off"
@@ -1131,7 +1129,7 @@
     </div>
     <div class="modal-shell-footer form-actions">
       <button type="button" class="secondary-button" (click)="cancelClearData()" [disabled]="clearDataBusy()">
-        Annuler
+        {{ lang.t('common.cancel') }}
       </button>
       <button
         type="button"
@@ -1139,7 +1137,7 @@
         [disabled]="clearDataBusy()"
         (click)="submitClearDataPin()"
       >
-        {{ clearDataBusy() ? 'Operation en cours...' : (mode === 'BLANK' ? 'Vider et sauvegarder' : 'Reinstaller demo') }}
+        {{ clearDataBusy() ? lang.t('management.operationInProgress') : (mode === 'BLANK' ? lang.t('management.wipeAndSave') : lang.t('management.reinstallDemo')) }}
       </button>
     </div>
     </div>

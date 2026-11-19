@@ -1,4 +1,4 @@
-package com.novapos.modules.identity;
+package com.RoxPos.modules.identity;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -26,7 +26,7 @@ class AuthControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
-                          "login": "cashier@novapos.ma",
+                          "login": "cashier@RoxPos.ma",
                           "password": "Pass123!"
                         }
                         """)
@@ -43,7 +43,7 @@ class AuthControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
-                          "login": "cashier@novapos.ma",
+                          "login": "cashier@RoxPos.ma",
                           "password": "wrong"
                         }
                         """)

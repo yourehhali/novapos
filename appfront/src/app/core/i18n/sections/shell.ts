@@ -1,0 +1,31 @@
+export const SHELL_FR: Record<string, string> = {
+  'shell.reduce': 'Reduire',
+  'shell.brandSubtitle': 'POS local',
+  'shell.nav.dashboard': 'Tableau de bord',
+  'shell.nav.pos': 'POS',
+  'shell.nav.service': 'Service',
+  'shell.nav.orders': 'Historique',
+  'shell.nav.management': 'Gestion',
+  'shell.nav.settings': 'Parametres',
+  'shell.activeBusiness': 'Entreprise active',
+  'shell.localMode': 'Mode local',
+  'shell.language': 'Langue',
+  'shell.languageFrench': 'Francais',
+  'shell.languageGerman': 'Allemand',
+};
+
+export const SHELL_DE: Record<string, string> = {
+  'shell.reduce': 'Einklappen',
+  'shell.brandSubtitle': 'Lokales POS',
+  'shell.nav.dashboard': 'Dashboard',
+  'shell.nav.pos': 'POS',
+  'shell.nav.service': 'Service',
+  'shell.nav.orders': 'Verlauf',
+  'shell.nav.management': 'Verwaltung',
+  'shell.nav.settings': 'Einstellungen',
+  'shell.activeBusiness': 'Aktives Unternehmen',
+  'shell.localMode': 'Lokaler Modus',
+  'shell.language': 'Sprache',
+  'shell.languageFrench': 'Franzoesisch',
+  'shell.languageGerman': 'Deutsch',
+};

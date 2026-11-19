@@ -1,6 +1,6 @@
-# NovaPOS Demo Setup
+# RoxPos Demo Setup
 
-This repo contains the first NovaPOS implementation slice:
+This repo contains the first RoxPos implementation slice:
 
 - Spring Boot backend in `api/`
 - Angular offline-first frontend in `appfront/`
@@ -10,7 +10,7 @@ This README is the quickest way to start the app and test the current vertical s
 
 ## Desktop POS Build
 
-NovaPOS now includes an Electron desktop shell in `appfront/` so the POS can print through the local machine without stopping on the Chrome print dialog when running as a desktop app.
+RoxPos now includes an Electron desktop shell in `appfront/` so the POS can print through the local machine without stopping on the Chrome print dialog when running as a desktop app.
 
 - macOS desktop dev: `cd appfront && npm run desktop:dev`
 - macOS package: `cd appfront && npm run desktop:package:mac`
@@ -47,14 +47,14 @@ Pass123!
 
 | Role | Email | Default Branch Access |
 |---|---|---|
-| Super Admin | `superadmin@novapos.ma` | Oujda, Rabat |
-| Business Owner | `owner@novapos.ma` | Oujda, Rabat |
-| Manager | `manager@novapos.ma` | Oujda |
-| Cashier | `cashier@novapos.ma` | Oujda |
-| Waiter | `waiter@novapos.ma` | Oujda |
-| Kitchen | `kitchen@novapos.ma` | Oujda |
-| Inventory Manager | `inventory@novapos.ma` | Oujda, Rabat |
-| Accountant | `accountant@novapos.ma` | Rabat |
+| Super Admin | `superadmin@RoxPos.ma` | Oujda, Rabat |
+| Business Owner | `owner@RoxPos.ma` | Oujda, Rabat |
+| Manager | `manager@RoxPos.ma` | Oujda |
+| Cashier | `cashier@RoxPos.ma` | Oujda |
+| Waiter | `waiter@RoxPos.ma` | Oujda |
+| Kitchen | `kitchen@RoxPos.ma` | Oujda |
+| Inventory Manager | `inventory@RoxPos.ma` | Oujda, Rabat |
+| Accountant | `accountant@RoxPos.ma` | Rabat |
 
 ### Demo Product Categories
 
@@ -87,7 +87,7 @@ Pass123!
 | `DRK-007` | ESPRESSO | DRINKS | `8.00 DH` |
 | `TAP-001` | GUACAMOLE CON NACHOS | TAPAS | `25.00 DH` |
 | `SAL-003` | BURRATA | SALADES | `65.00 DH` |
-| `EXT-001` | SAUCE HOLEMOLE | EXTRAS | `5.00 DH` |
+| `EXT-001` | SAUCE AlmaniNafris | EXTRAS | `5.00 DH` |
 | `GLV-006` | COMBO M | GLOVO | `142.00 DH` |
 
 ### Demo Printer Targets
@@ -197,7 +197,7 @@ If you just want to see the app working end to end, use this path:
 3. Log in with:
 
 ```text
-cashier@novapos.ma
+cashier@RoxPos.ma
 Pass123!
 ```
 
@@ -219,8 +219,8 @@ Pass123!
 
 ### 1. Login Test
 
-- Try `cashier@novapos.ma / Pass123!`
-- Try `owner@novapos.ma / Pass123!`
+- Try `cashier@RoxPos.ma / Pass123!`
+- Try `owner@RoxPos.ma / Pass123!`
 - Try an invalid password and confirm login is rejected
 
 ### 2. Branch Bootstrap Test
@@ -260,12 +260,12 @@ Pass123!
 
 Use these accounts and confirm navigation/scope changes:
 
-- `superadmin@novapos.ma`
-- `owner@novapos.ma`
-- `manager@novapos.ma`
-- `cashier@novapos.ma`
-- `inventory@novapos.ma`
-- `accountant@novapos.ma`
+- `superadmin@RoxPos.ma`
+- `owner@RoxPos.ma`
+- `manager@RoxPos.ma`
+- `cashier@RoxPos.ma`
+- `inventory@RoxPos.ma`
+- `accountant@RoxPos.ma`
 
 ## API Endpoints You Can Hit Manually
 
@@ -274,7 +274,7 @@ Use these accounts and confirm navigation/scope changes:
 ```bash
 curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"login":"cashier@novapos.ma","password":"Pass123!"}'
+  -d '{"login":"cashier@RoxPos.ma","password":"Pass123!"}'
 ```
 
 ### Products
@@ -327,6 +327,6 @@ curl -X POST http://localhost:8080/api/sync/events \
 
 If you want the fastest path:
 
-- `cashier@novapos.ma` for POS testing
-- `owner@novapos.ma` for branch switching and admin screens
-- `inventory@novapos.ma` for broader role coverage
+- `cashier@RoxPos.ma` for POS testing
+- `owner@RoxPos.ma` for branch switching and admin screens
+- `inventory@RoxPos.ma` for broader role coverage

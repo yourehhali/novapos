@@ -1,8 +1,8 @@
-package com.novapos.modules.catalog;
+package com.RoxPos.modules.catalog;
 
-import com.novapos.modules.catalog.dto.CategoryResponse;
-import com.novapos.modules.catalog.dto.ProductResponse;
-import com.novapos.modules.shared.SampleDataService;
+import com.RoxPos.modules.catalog.dto.CategoryResponse;
+import com.RoxPos.modules.catalog.dto.ProductResponse;
+import com.RoxPos.modules.shared.SampleDataService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

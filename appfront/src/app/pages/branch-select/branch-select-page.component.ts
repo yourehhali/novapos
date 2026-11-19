@@ -1,5 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
+import { LanguageService } from '../../core/i18n/language.service';
 import { AuthService } from '../../core/services/auth.service';
 import { SessionService } from '../../core/services/session.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
@@ -9,17 +10,14 @@ import { WorkspaceService } from '../../core/services/workspace.service';
   template: `
     <section class="select-shell">
       <header>
-        <p class="eyebrow">Initialisation succursale et appareil</p>
-        <h1>Selectionnez votre succursale</h1>
-        <p class="lead">
-          Chargez l espace local pour cet appareil. Le catalogue, les imprimantes et l etat de synchro
-          sont mis en cache apres cette etape pour continuer a fonctionner hors ligne.
-        </p>
+        <p class="eyebrow">{{ lang.t('branch.eyebrow') }}</p>
+        <h1>{{ lang.t('branch.title') }}</h1>
+        <p class="lead">{{ lang.t('branch.lead') }}</p>
       </header>
 
       <div class="panel-grid">
         <article class="panel">
-          <h2>Succursales assignees</h2>
+          <h2>{{ lang.t('branch.assignedBranches') }}</h2>
 
           <button
             *ngFor="let branch of session.user()?.branchAssignments"
@@ -34,10 +32,10 @@ import { WorkspaceService } from '../../core/services/workspace.service';
         </article>
 
         <form class="panel" (ngSubmit)="continueToWorkspace()">
-          <h2>Liaison appareil</h2>
+          <h2>{{ lang.t('branch.deviceLink') }}</h2>
 
           <label>
-            Type d appareil
+            {{ lang.t('branch.deviceType') }}
             <select [(ngModel)]="deviceType" name="deviceType">
               <option value="POS_TERMINAL">POS_TERMINAL</option>
               <option value="TABLET">TABLET</option>
@@ -46,12 +44,16 @@ import { WorkspaceService } from '../../core/services/workspace.service';
           </label>
 
           <label>
-            Code appareil
-            <input [(ngModel)]="deviceCode" name="deviceCode" placeholder="Code personnalise optionnel" />
+            {{ lang.t('branch.deviceCode') }}
+            <input
+              [(ngModel)]="deviceCode"
+              name="deviceCode"
+              [attr.placeholder]="lang.t('branch.deviceCodePlaceholder')"
+            />
           </label>
 
           <button type="submit" [disabled]="loading() || !selectedBranchId()">
-            {{ loading() ? 'Preparation en cours...' : 'Charger l espace succursale' }}
+            {{ loading() ? lang.t('branch.preparing') : lang.t('branch.loadWorkspace') }}
           </button>
         </form>
       </div>
@@ -178,6 +180,7 @@ export class BranchSelectPageComponent {
   private readonly router = inject(Router);
 
   protected readonly session = inject(SessionService);
+  protected readonly lang = inject(LanguageService);
   protected readonly loading = signal(false);
   protected readonly selectedBranchId = signal(
     this.session.user()?.branchAssignments[0]?.branchId ?? '',

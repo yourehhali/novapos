@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+
+# Build a macOS installer (.dmg + .zip) for the RoxPos desktop app on this machine.
+#
+# Usage:
+#   ./buildapp                 Build the renderer + Electron main, then package the macOS installer
+#   ./buildapp --run           Same as above, then launch the packaged app so you can test it
+#   ./buildapp --clean         Remove all previous build output before building
+#   ./buildapp --arch=<arch>   Package for a specific architecture (x64, arm64 or universal)
+#   ./buildapp --help          Show this help
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="$ROOT_DIR/appfront"
+
+RUN_AFTER=0
+CLEAN=0
+ARCH=""
+
+print_header() {
+  printf '\n==> %s\n' "$1"
+}
+
+usage() {
+  sed -n '3,10p' "${BASH_SOURCE[0]}" | sed -E 's/^# ?//'
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --run | -r) RUN_AFTER=1 ;;
+    --clean | -c) CLEAN=1 ;;
+    --arch=*) ARCH="${arg#*=}" ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $arg"
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if ! command -v node >/dev/null 2>&1; then
+  echo "Missing required command: node"
+  exit 1
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "Missing required command: npm"
+  exit 1
+fi
+
+if [[ "$(uname -s)" != "Darwin" ]]; then
+  echo "buildapp currently only builds macOS installers."
+  exit 1
+fi
+
+cd "$APP_DIR"
+
+if [[ ! -d node_modules ]]; then
+  print_header "Installing dependencies"
+  npm install
+fi
+
+if [[ "$CLEAN" -eq 1 ]]; then
+  print_header "Cleaning previous build output"
+  rm -rf dist dist-electron release
+else
+  rm -rf release
+fi
+
+print_header "Building renderer and Electron main"
+npm run desktop:build
+
+print_header "Packaging macOS installer"
+ELECTRON_BUILDER_ARGS=(--publish never --mac dmg zip)
+
+if [[ -n "$ARCH" ]]; then
+  ELECTRON_BUILDER_ARGS+=("--$ARCH")
+fi
+
+# Skip code signing so an unsigned local build succeeds without a Developer certificate.
+CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder "${ELECTRON_BUILDER_ARGS[@]}"
+
+shopt -s nullglob
+ARTIFACTS=("$APP_DIR"/release/*.dmg "$APP_DIR"/release/*.zip)
+APP_BUNDLES=("$APP_DIR"/release/*/*.app)
+APP_BUNDLE="${APP_BUNDLES[0]:-}"
+
+print_header "Build complete"
+
+if [[ "${#ARTIFACTS[@]}" -gt 0 ]]; then
+  ls -lh "${ARTIFACTS[@]}"
+else
+  echo "No installer artifacts were produced."
+fi
+
+if [[ "$RUN_AFTER" -eq 1 ]]; then
+  if [[ -n "$APP_BUNDLE" ]]; then
+    print_header "Launching packaged app for testing"
+    open "$APP_BUNDLE"
+  else
+    echo "No packaged .app bundle found under release/."
+  fi
+else
+  open "$APP_DIR/release" 2>/dev/null || true
+  echo
+  if [[ -n "$APP_BUNDLE" ]]; then
+    echo "Test the packaged app directly with:"
+    echo "  open \"$APP_BUNDLE\""
+  fi
+  echo "Or run './buildapp --run' to build and launch it in one step."
+fi

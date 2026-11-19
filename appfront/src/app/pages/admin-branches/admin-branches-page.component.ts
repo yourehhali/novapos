@@ -1,12 +1,13 @@
 import { Component, inject } from '@angular/core';
+import { LanguageService } from '../../core/i18n/language.service';
 import { SessionService } from '../../core/services/session.service';
 
 @Component({
   selector: 'app-admin-branches-page',
   template: `
     <section class="panel">
-      <p class="eyebrow">Administration succursales</p>
-      <h1>Succursales assignees</h1>
+      <p class="eyebrow">{{ lang.t('admin.branchesEyebrow') }}</p>
+      <h1>{{ lang.t('admin.assignedBranches') }}</h1>
       <div class="branch-list">
         <article *ngFor="let branch of session.user()?.branchAssignments">
           <strong>{{ branch.branchName }}</strong>
@@ -29,4 +30,5 @@ import { SessionService } from '../../core/services/session.service';
 })
 export class AdminBranchesPageComponent {
   protected readonly session = inject(SessionService);
+  protected readonly lang = inject(LanguageService);
 }

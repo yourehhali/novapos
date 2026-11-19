@@ -1,11 +1,12 @@
 import { Component, inject } from '@angular/core';
+import { LanguageService } from '../../core/i18n/language.service';
 import { SessionService } from '../../core/services/session.service';
 
 @Component({
   selector: 'app-admin-business-page',
   template: `
     <section class="panel">
-      <p class="eyebrow">Administration entreprise</p>
+      <p class="eyebrow">{{ lang.t('admin.businessEyebrow') }}</p>
       <h1>{{ session.user()?.businessName }}</h1>
       <div class="detail-grid">
         <article>
@@ -13,11 +14,11 @@ import { SessionService } from '../../core/services/session.service';
           <strong>{{ session.user()?.tenantId }}</strong>
         </article>
         <article>
-          <span>Roles</span>
+          <span>{{ lang.t('admin.roles') }}</span>
           <strong>{{ session.user()?.roles?.join(', ') }}</strong>
         </article>
         <article>
-          <span>Operateur</span>
+          <span>{{ lang.t('admin.operator') }}</span>
           <strong>{{ session.user()?.displayName }}</strong>
         </article>
       </div>
@@ -41,4 +42,5 @@ import { SessionService } from '../../core/services/session.service';
 })
 export class AdminBusinessPageComponent {
   protected readonly session = inject(SessionService);
+  protected readonly lang = inject(LanguageService);
 }

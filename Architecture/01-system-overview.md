@@ -150,7 +150,7 @@ graph LR
 
 ```mermaid
 journey
-    title NovaPOS Business Day With Offline-First Operation
+    title RoxPos Business Day With Offline-First Operation
     section Opening
       Manager logs in locally: 5: Manager
       Cash drawer opens and devices load projections: 5: Cashier, Manager

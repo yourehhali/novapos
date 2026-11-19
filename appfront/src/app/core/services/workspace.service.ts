@@ -12,23 +12,27 @@ import {
   Product,
   SyncStatus,
 } from '../models/app.models';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 import { SessionService } from './session.service';
 import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS } from './business-settings.service';
+import { LanguageService } from '../i18n/language.service';
 import {
   getOfflineDemoCatalog,
   getOfflineDemoDashboard,
   getOfflineDemoPrinters,
+  getOfflineDemoSignature,
   getOfflineDemoSyncStatus,
 } from '../demo/offline-demo.data';
 
 @Injectable({ providedIn: 'root' })
 export class WorkspaceService {
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
   private readonly session = inject(SessionService);
   private readonly businessSettings = inject(BusinessSettingsService);
+  protected readonly lang = inject(LanguageService);
   private catalogCache: { products: Product[]; categories: Category[] } | null = null;
   private printersCache: PrinterConfig[] | null = null;
+  private demoDataCheck: Promise<void> | null = null;
   private readonly catalogChangedSource = new Subject<void>();
   private readonly tablesChangedSource = new Subject<void>();
   private readonly driversChangedSource = new Subject<void>();
@@ -77,7 +81,46 @@ export class WorkspaceService {
   }
 
   async loadCatalog(): Promise<{ products: Product[]; categories: Category[] }> {
+    await this.ensureDemoDataCurrent();
     return this.loadCachedOrDemoCatalog();
+  }
+
+  /**
+   * Re-seeds the bundled demo data whenever it changes in code. Without this,
+   * a value saved to IndexedDB during an earlier run (e.g. the old business
+   * name) keeps hiding the change made in the source after a refresh/restart.
+   */
+  private ensureDemoDataCurrent(): Promise<void> {
+    if (!this.demoDataCheck) {
+      this.demoDataCheck = this.runDemoDataCheck();
+    }
+    return this.demoDataCheck;
+  }
+
+  private async runDemoDataCheck(): Promise<void> {
+    const settings = await this.businessSettings.load();
+    const seedingMode: DemoSeedingMode = settings?.demoSeedingMode ?? DEFAULT_BUSINESS_SETTINGS.demoSeedingMode;
+    if (seedingMode !== 'DEMO') {
+      return;
+    }
+
+    const signature = getOfflineDemoSignature();
+    if (settings.demoDataSignature === signature) {
+      return;
+    }
+
+    const catalog = this.normalizeCatalog(getOfflineDemoCatalog());
+    await this.persistCatalog(catalog);
+    try {
+      await this.db.printers.clear();
+      await this.db.printers.bulkPut(getOfflineDemoPrinters());
+    } catch {
+      // ignore printer seeding errors
+    }
+    this.printersCache = null;
+
+    await this.businessSettings.save({ ...settings, demoDataSignature: signature });
+    this.invalidateAllCachesAndEmit('all');
   }
 
   async loadDashboard(): Promise<DashboardSummary | null> {
@@ -89,6 +132,7 @@ export class WorkspaceService {
   }
 
   async loadPrinters(): Promise<PrinterConfig[]> {
+    await this.ensureDemoDataCurrent();
     return this.loadCachedOrDemoPrinters();
   }
 
@@ -121,11 +165,10 @@ export class WorkspaceService {
     ]);
 
     if (products.length > 0 && categories.length > 0) {
-      const cachedCatalog = this.normalizeCatalog({ products, categories });
-      if (!this.hasExpectedCategoryStructure(cachedCatalog, demoCatalog) && seedingMode === 'DEMO') {
-        return this.persistCatalog(demoCatalog);
-      }
-      this.catalogCache = cachedCatalog;
+      // Keep whatever is stored locally (including edits made in Management).
+      // Code-level demo changes are handled once by ensureDemoDataCurrent(),
+      // which re-seeds only when the bundled dataset itself changed.
+      this.catalogCache = this.normalizeCatalog({ products, categories });
       return this.catalogCache;
     }
 
@@ -154,20 +197,6 @@ export class WorkspaceService {
       products: [...catalog.products],
       categories: orderedCategories,
     };
-  }
-
-  private hasExpectedCategoryStructure(
-    candidateCatalog: { products: Product[]; categories: Category[] },
-    expectedCatalog: { products: Product[]; categories: Category[] },
-  ): boolean {
-    if (candidateCatalog.categories.length !== expectedCatalog.categories.length) {
-      return false;
-    }
-
-    return expectedCatalog.categories.every((category, index) => {
-      const candidate = candidateCatalog.categories[index];
-      return candidate?.id === category.id && candidate?.name === category.name;
-    });
   }
 
   private async persistCatalog(catalog: {
@@ -217,14 +246,16 @@ export class WorkspaceService {
     const revenueCardToday = paidToday
       .filter((order) => order.paymentMethod === 'CARD')
       .reduce((sum, order) => sum + order.total, 0);
-    const lastSuccessfulSyncAt = baseSummary?.lastSuccessfulSyncAt ?? 'En attente';
+    const lastSuccessfulSyncAt = baseSummary?.lastSuccessfulSyncAt ?? this.lang.t('services.pending');
 
     const operationalNotes = [
       pendingQueue.length > 0
-        ? `${pendingQueue.length} evenements attendent encore la synchronisation`
-        : 'La file locale est synchronisee sur cet appareil',
-      `${activeOrders} commande(s) preparee(s) en attente de paiement`,
-      `${normalizedOrders.filter((order) => order.status === 'PAID').length} commande(s) payee(s) conservees localement`,
+        ? this.lang.t('services.pendingEventsAwaitingSync', { count: pendingQueue.length })
+        : this.lang.t('services.localQueueSyncedOnDevice'),
+      this.lang.t('services.preparedOrdersAwaitingPayment', { count: activeOrders }),
+      this.lang.t('services.paidOrdersStoredLocally', {
+        count: normalizedOrders.filter((order) => order.status === 'PAID').length,
+      }),
     ];
 
     const computedSummary: DashboardSummary = {
@@ -364,6 +395,7 @@ export class WorkspaceService {
         ...DEFAULT_BUSINESS_SETTINGS,
         ...existingSettings,
         demoSeedingMode: mode,
+        demoDataSignature: mode === 'DEMO' ? getOfflineDemoSignature() : existingSettings.demoDataSignature,
         updatedAt: new Date().toISOString(),
       };
       await db.businessSettings.put(nextSettings);

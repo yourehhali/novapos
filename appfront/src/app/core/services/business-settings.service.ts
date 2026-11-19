@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { BusinessSettings, DemoSeedingMode, LogoType, TicketLayoutConfig } from '../models/app.models';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 
 export function defaultTicketLayoutConfig(kind: 'payment' | 'kitchen'): TicketLayoutConfig {
   if (kind === 'kitchen') {
@@ -74,7 +74,8 @@ export function mergeTicketLayoutConfig(
 
 export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
   id: 'current',
-  businessName: 'Hole Mole',
+  businessName: 'Almani Nafris',
+  businessNameCustomized: false,
   addressLine1: '',
   addressLine2: '',
   phone: '',
@@ -104,18 +105,28 @@ export const DEFAULT_BUSINESS_SETTINGS: BusinessSettings = {
 };
 
 function normalizeBusinessSettings(row: Partial<BusinessSettings> | BusinessSettings): BusinessSettings {
-  return {
+  const merged: BusinessSettings = {
     ...DEFAULT_BUSINESS_SETTINGS,
     ...row,
     demoSeedingMode: (row?.demoSeedingMode ?? DEFAULT_BUSINESS_SETTINGS.demoSeedingMode) as DemoSeedingMode,
     paymentTicket: { ...defaultTicketLayoutConfig('payment'), ...((row?.paymentTicket ?? {}) as Partial<TicketLayoutConfig>) } as TicketLayoutConfig,
     kitchenTicket: { ...defaultTicketLayoutConfig('kitchen'), ...((row?.kitchenTicket ?? {}) as Partial<TicketLayoutConfig>) } as TicketLayoutConfig,
   };
+
+  // The business name follows the built-in default unless it was explicitly
+  // customized in Management. This keeps a stale saved value (from an earlier
+  // build) from hiding a change made to the default name in code.
+  if (row.businessNameCustomized !== true) {
+    merged.businessName = DEFAULT_BUSINESS_SETTINGS.businessName;
+    merged.businessNameCustomized = false;
+  }
+
+  return merged;
 }
 
 @Injectable({ providedIn: 'root' })
 export class BusinessSettingsService {
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
   private readonly cached = signal<BusinessSettings | null>(null);
 
   snapshot(): BusinessSettings | null {
@@ -142,9 +153,12 @@ export class BusinessSettingsService {
   }
 
   async save(settings: BusinessSettings): Promise<BusinessSettings> {
+    const businessNameCustomized =
+      settings.businessName.trim() !== DEFAULT_BUSINESS_SETTINGS.businessName.trim();
     const toSave: BusinessSettings = normalizeBusinessSettings({
       ...settings,
       id: 'current',
+      businessNameCustomized,
       updatedAt: new Date().toISOString(),
     });
     await this.db.businessSettings.put(toSave);

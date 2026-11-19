@@ -1,5 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 import {
   CompletedOrder,
   ReportPrintState,
@@ -10,7 +10,7 @@ import { SessionService } from './session.service';
 
 @Injectable({ providedIn: 'root' })
 export class SalesSummaryService {
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
   private readonly session = inject(SessionService);
 
   async buildReport(range: SalesSummaryRange): Promise<SalesSummaryReport | null> {

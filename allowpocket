@@ -1,0 +1,197 @@
+100% w#!/usr/bin/env bash
+
+# Allow the RoxPos desktop app through the macOS firewall so a phone on the same
+# network can reach the mobile POS (pocket server).
+#
+# macOS does not apply its built-in firewall per port, it works per application.
+# By default this script allow-lists the RoxPos / Electron binary. Use --ports to
+# additionally install a pf rule for the pocket port range (8787-8798).
+#
+# Usage:
+#   ./allowpocket             Allow the RoxPos app (packaged and dev) through the firewall
+#   ./allowpocket --status    Show the firewall state and the pocket port rule
+#   ./allowpocket --ports     Also add a pf rule for ports 8787-8798
+#   ./allowpocket --revert    Undo everything this script changed
+#   ./allowpocket --help      Show this help
+
+set -euo pipefail
+
+shopt -s nullglob
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SELF_PATH="$ROOT_DIR/$(basename "${BASH_SOURCE[0]}")"
+
+SOCKETFILTERFW="/usr/libexec/ApplicationFirewall/socketfilterfw"
+PF_ANCHOR="roxpos-pocket"
+PF_ANCHOR_FILE="/etc/pf.anchors/$PF_ANCHOR"
+PF_CONF="/etc/pf.conf"
+PF_MARKER="# RoxPos pocket server (added by allowpocket)"
+POCKET_PORTS="8787, 8788, 8789, 8790, 8791, 8792, 8793, 8794, 8795, 8796, 8797, 8798"
+
+STATUS=0
+PORTS=0
+REVERT=0
+
+usage() {
+  sed -n '3,15p' "$SELF_PATH" | sed -E 's/^# ?//'
+}
+
+for arg in "$@"; do
+  case "$arg" in
+    --status | -s) STATUS=1 ;;
+    --ports | -p) PORTS=1 ;;
+    --revert) REVERT=1 ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      echo "Unknown option: $arg"
+      echo
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+app_bundles() {
+  local candidates=(
+    "$ROOT_DIR"/appfront/release/mac*/*.app
+    /Applications/RoxPos.app
+    "$ROOT_DIR"/appfront/node_modules/electron/dist/Electron.app
+  )
+  local app
+
+  for app in "${candidates[@]}"; do
+    [[ -d "$app" ]] && printf '%s\n' "$app"
+  done
+}
+
+allow_app() {
+  "$SOCKETFILTERFW" --add "$1" >/dev/null 2>&1 || true
+  "$SOCKETFILTERFW" --unblockapp "$1" >/dev/null 2>&1 || true
+  echo "  allowed  $1"
+}
+
+remove_app() {
+  "$SOCKETFILTERFW" --remove "$1" >/dev/null 2>&1 || true
+  echo "  removed  $1"
+}
+
+show_status() {
+  echo "Application firewall:"
+  "$SOCKETFILTERFW" --getglobalstate 2>/dev/null | sed 's/^/  /' || true
+  echo
+  echo "Firewall entries for RoxPos / Electron:"
+  if "$SOCKETFILTERFW" --listapps 2>/dev/null | grep -iE 'roxpos|electron' | sed 's/^/  /'; then
+    :
+  else
+    echo "  (none)"
+  fi
+  echo
+  echo "pf port rule:"
+  if [[ -f "$PF_ANCHOR_FILE" ]]; then
+    sed 's/^/  /' "$PF_ANCHOR_FILE"
+  else
+    echo "  (not installed)"
+  fi
+  echo
+  echo "pf state:"
+  pfctl -s info 2>/dev/null | head -n 2 | sed 's/^/  /' || true
+}
+
+install_pf_rule() {
+  echo "  writing $PF_ANCHOR_FILE"
+  {
+    echo "# RoxPos pocket server: allow inbound mobile POS traffic"
+    echo "pass in proto tcp from any to any port { $POCKET_PORTS }"
+  } >"$PF_ANCHOR_FILE"
+
+  if ! grep -qF "anchor \"$PF_ANCHOR\"" "$PF_CONF"; then
+    {
+      echo ""
+      echo "$PF_MARKER"
+      echo "anchor \"$PF_ANCHOR\""
+      echo "load anchor \"$PF_ANCHOR\" from \"$PF_ANCHOR_FILE\""
+    } >>"$PF_CONF"
+    echo "  registered anchor in $PF_CONF"
+  fi
+
+  pfctl -f "$PF_CONF" 2>/dev/null || true
+  pfctl -e >/dev/null 2>&1 || true
+  echo "  pf now allows inbound TCP on ports 8787-8798"
+}
+
+revert_pf_rule() {
+  if [[ -f "$PF_CONF" ]] && grep -qF "$PF_MARKER" "$PF_CONF"; then
+    awk -v marker="$PF_MARKER" '
+      $0 == marker { skip = 3; next }
+      skip > 0 { skip--; next }
+      { print }
+    ' "$PF_CONF" >"$PF_CONF.roxpos.tmp"
+    mv "$PF_CONF.roxpos.tmp" "$PF_CONF"
+    pfctl -f "$PF_CONF" 2>/dev/null || true
+    echo "  removed anchor block from $PF_CONF"
+  fi
+
+  if [[ -f "$PF_ANCHOR_FILE" ]]; then
+    rm -f "$PF_ANCHOR_FILE"
+    echo "  removed $PF_ANCHOR_FILE"
+  fi
+}
+
+# Reading the state does not need administrator rights.
+if [[ "$STATUS" -eq 1 ]]; then
+  show_status
+  exit 0
+fi
+
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  echo "Administrator rights are required to change firewall settings."
+  exec sudo -E "$SELF_PATH" "$@"
+fi
+
+if [[ "$REVERT" -eq 1 ]]; then
+  echo "Reverting RoxPos firewall changes..."
+
+  FOUND=0
+  while IFS= read -r app; do
+    [[ -n "$app" ]] || continue
+    remove_app "$app"
+    FOUND=1
+  done < <(app_bundles)
+
+  [[ "$FOUND" -eq 0 ]] && echo "  no RoxPos or Electron app bundle found."
+  revert_pf_rule
+
+  echo
+  echo "Done. Restart the RoxPos app if the firewall is enabled."
+  exit 0
+fi
+
+echo "Allowing the RoxPos app through the macOS firewall..."
+
+if "$SOCKETFILTERFW" --getglobalstate 2>/dev/null | grep -qi 'disabled'; then
+  echo "  note: the application firewall is currently off, so nothing is being blocked."
+fi
+
+FOUND=0
+while IFS= read -r app; do
+  [[ -n "$app" ]] || continue
+  allow_app "$app"
+  FOUND=1
+done < <(app_bundles)
+
+if [[ "$FOUND" -eq 0 ]]; then
+  echo "  no RoxPos or Electron app bundle found to allow."
+  echo "  build the installer first with ./buildapp, or run this from the project root."
+fi
+
+if [[ "$PORTS" -eq 1 ]]; then
+  echo
+  echo "Adding pf rule for the pocket port range..."
+  install_pf_rule
+fi
+
+echo
+echo "Done. Restart the RoxPos app if the firewall is enabled, then re-enable the mobile POS."

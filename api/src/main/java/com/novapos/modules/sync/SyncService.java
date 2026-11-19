@@ -1,8 +1,8 @@
-package com.novapos.modules.sync;
+package com.RoxPos.modules.sync;
 
-import com.novapos.modules.sync.dto.SyncBatchRequest;
-import com.novapos.modules.sync.dto.SyncBatchResponse;
-import com.novapos.modules.sync.dto.SyncStatusResponse;
+import com.RoxPos.modules.sync.dto.SyncBatchRequest;
+import com.RoxPos.modules.sync.dto.SyncBatchResponse;
+import com.RoxPos.modules.sync.dto.SyncStatusResponse;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;

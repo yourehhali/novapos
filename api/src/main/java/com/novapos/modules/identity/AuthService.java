@@ -1,10 +1,10 @@
-package com.novapos.modules.identity;
+package com.RoxPos.modules.identity;
 
-import com.novapos.common.security.SessionPrincipal;
-import com.novapos.common.security.TokenService;
-import com.novapos.modules.identity.dto.AuthSessionResponse;
-import com.novapos.modules.identity.dto.LoginRequest;
-import com.novapos.modules.shared.SampleDataService;
+import com.RoxPos.common.security.SessionPrincipal;
+import com.RoxPos.common.security.TokenService;
+import com.RoxPos.modules.identity.dto.AuthSessionResponse;
+import com.RoxPos.modules.identity.dto.LoginRequest;
+import com.RoxPos.modules.shared.SampleDataService;
 import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;

@@ -1,4 +1,4 @@
-package com.novapos.modules.identity.dto;
+package com.RoxPos.modules.identity.dto;
 
 import java.util.List;
 

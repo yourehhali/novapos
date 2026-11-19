@@ -1,8 +1,11 @@
-import { Injectable, computed, signal } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { AuthUser, BootstrapSession } from '../models/app.models';
+import { LanguageService } from '../i18n/language.service';
 
 @Injectable({ providedIn: 'root' })
 export class SessionService {
+  protected readonly lang = inject(LanguageService);
+
   readonly accessToken = signal<string | null>(null);
   readonly refreshToken = signal<string | null>(null);
   readonly user = signal<AuthUser | null>(null);
@@ -10,7 +13,7 @@ export class SessionService {
 
   readonly isAuthenticated = computed(() => !!this.accessToken() && !!this.user());
   readonly displayName = computed(() => this.user()?.displayName ?? 'Guest');
-  readonly currentBranchName = computed(() => this.branch()?.branchName ?? 'Aucune succursale');
+  readonly currentBranchName = computed(() => this.branch()?.branchName ?? this.lang.t('services.noBranch'));
 
   setAuth(accessToken: string, refreshToken: string, user: AuthUser): void {
     this.accessToken.set(accessToken);

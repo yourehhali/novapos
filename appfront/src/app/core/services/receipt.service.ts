@@ -11,6 +11,7 @@ import {
 import { AppModalService } from './app-modal.service';
 import { BusinessSettingsService, DEFAULT_BUSINESS_SETTINGS } from './business-settings.service';
 import { DesktopBridgeService } from './desktop-bridge.service';
+import { LanguageService } from '../i18n/language.service';
 
 type TicketKind = PrintTicketRequest['kind'];
 const DESKTOP_ESCPOS_TIMEOUT_MS = 5000;
@@ -20,6 +21,7 @@ export class ReceiptService {
   private readonly appModal = inject(AppModalService);
   private readonly desktopBridge = inject(DesktopBridgeService);
   private readonly businessSettingsService = inject(BusinessSettingsService);
+  protected readonly lang = inject(LanguageService);
 
   private settingsCache: BusinessSettings | null = null;
 
@@ -41,9 +43,9 @@ export class ReceiptService {
 
     if (!this.desktopBridge.isDesktop()) {
       this.showPrintError(
-        'Impression du total impossible',
-        'Le total journalier n a pas pu etre imprime.',
-        'Application non executee en mode bureau. Utilisez NovaPOS bureau pour imprimer.',
+        this.lang.t('services.salesSummaryPrintFailedTitle'),
+        this.lang.t('services.salesSummaryPrintFailedMessage'),
+        this.lang.t('services.desktopAppRequired'),
       );
       return false;
     }
@@ -61,16 +63,16 @@ export class ReceiptService {
       const result = await Promise.race([desktopPromise, timeout]);
       if (result?.success) return true;
       this.showPrintError(
-        'Impression du total impossible',
-        'Le total journalier n a pas pu etre imprime.',
-        result ? this.describePrintFailure(result, 'Impression bureau du total echouee.') : 'Délai d impression depasse.',
+        this.lang.t('services.salesSummaryPrintFailedTitle'),
+        this.lang.t('services.salesSummaryPrintFailedMessage'),
+        result ? this.describePrintFailure(result, this.lang.t('services.desktopSummaryPrintFailed')) : this.lang.t('services.printTimeout'),
       );
       return false;
     } catch (error) {
       this.showPrintError(
-        'Impression du total impossible',
-        'Le total journalier n a pas pu etre imprime.',
-        this.describeUnknownError(error, 'Impression bureau du total echouee.'),
+        this.lang.t('services.salesSummaryPrintFailedTitle'),
+        this.lang.t('services.salesSummaryPrintFailedMessage'),
+        this.describeUnknownError(error, this.lang.t('services.desktopSummaryPrintFailed')),
       );
       return false;
     }
@@ -82,11 +84,11 @@ export class ReceiptService {
     const paperWidthMm = printer?.paperWidthMm ?? (kind === 'KITCHEN' ? settings.kitchenPaperWidthMm : settings.receiptPaperWidthMm);
 
     if (!this.desktopBridge.isDesktop()) {
-      const ticketLabel = kind === 'KITCHEN' ? 'le ticket cuisine' : 'le ticket de paiement';
+      const ticketLabel = kind === 'KITCHEN' ? this.lang.t('services.kitchenTicketLabel') : this.lang.t('services.paymentTicketLabel');
       this.showPrintError(
-        'Impression impossible',
-        `Nous n avons pas pu imprimer ${ticketLabel}.`,
-        'Application non executee en mode bureau. Utilisez NovaPOS bureau pour imprimer.',
+        this.lang.t('services.printNotPossible'),
+        this.lang.t('services.printTicketFailed', { ticket: ticketLabel }),
+        this.lang.t('services.desktopAppRequired'),
       );
       return false;
     }
@@ -104,19 +106,19 @@ export class ReceiptService {
       const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
       const result = await Promise.race([desktopPromise, timeout]);
       if (result?.success) return true;
-      const ticketLabel = kind === 'KITCHEN' ? 'le ticket cuisine' : 'le ticket de paiement';
+      const ticketLabel = kind === 'KITCHEN' ? this.lang.t('services.kitchenTicketLabel') : this.lang.t('services.paymentTicketLabel');
       this.showPrintError(
-        'Impression impossible',
-        `Nous n avons pas pu imprimer ${ticketLabel}.`,
-        result ? this.describePrintFailure(result, 'Impression bureau echouee.') : 'Délai d impression depasse.',
+        this.lang.t('services.printNotPossible'),
+        this.lang.t('services.printTicketFailed', { ticket: ticketLabel }),
+        result ? this.describePrintFailure(result, this.lang.t('services.desktopPrintFailed')) : this.lang.t('services.printTimeout'),
       );
       return false;
     } catch (error) {
-      const ticketLabel = kind === 'KITCHEN' ? 'le ticket cuisine' : 'le ticket de paiement';
+      const ticketLabel = kind === 'KITCHEN' ? this.lang.t('services.kitchenTicketLabel') : this.lang.t('services.paymentTicketLabel');
       this.showPrintError(
-        'Impression impossible',
-        `Nous n avons pas pu imprimer ${ticketLabel}.`,
-        this.describeUnknownError(error, 'Impression bureau echouee.'),
+        this.lang.t('services.printNotPossible'),
+        this.lang.t('services.printTicketFailed', { ticket: ticketLabel }),
+        this.describeUnknownError(error, this.lang.t('services.desktopPrintFailed')),
       );
       return false;
     }
@@ -147,7 +149,7 @@ export class ReceiptService {
     const width = paperWidthMm ?? 80;
     return {
       id: isKitchen ? 'kitchen-local' : 'receipt-local',
-      name: name?.trim() || 'Impression locale',
+      name: name?.trim() || this.lang.t('services.localPrint'),
       target,
       protocol: ip?.trim() ? 'ESC_POS_IP' : 'BROWSER',
       queueName: hostOrQueue || queueName || target,
@@ -161,7 +163,7 @@ export class ReceiptService {
 
   private describePrintFailure(result: PrintTicketResult | null, fallback: string): string {
     if (!result) return fallback;
-    return result.printerName ? `${result.message} Imprimante cible: ${result.printerName}.` : result.message;
+    return result.printerName ? `${result.message} ${this.lang.t('services.printerTargetSuffix', { printer: result.printerName })}` : result.message;
   }
 
   private describeUnknownError(error: unknown, fallback: string): string {

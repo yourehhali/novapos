@@ -15,6 +15,7 @@ import { DashboardPageComponent } from './pages/dashboard/dashboard-page.compone
 import { LoginPageComponent } from './pages/login/login-page.component';
 import { OrderHistoryPageComponent } from './pages/order-history/order-history-page.component';
 import { PosPageComponent } from './pages/pos/pos-page.component';
+import { PocketPanelComponent } from './pages/settings/pocket-panel/pocket-panel.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { AppModalComponent } from './shared/components/app-modal/app-modal.component';
 
@@ -28,6 +29,7 @@ import { AppModalComponent } from './shared/components/app-modal/app-modal.compo
     PosPageComponent,
     OrderHistoryPageComponent,
     SettingsPageComponent,
+    PocketPanelComponent,
     AppModalComponent,
     AdminBusinessPageComponent,
     AdminBranchesPageComponent,

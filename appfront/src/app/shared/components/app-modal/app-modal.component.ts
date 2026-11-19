@@ -1,4 +1,5 @@
 import { Component, HostListener, inject } from '@angular/core';
+import { LanguageService } from '../../../core/i18n/language.service';
 import { AppModalService } from '../../../core/services/app-modal.service';
 
 @Component({
@@ -9,6 +10,7 @@ import { AppModalService } from '../../../core/services/app-modal.service';
 })
 export class AppModalComponent {
   protected readonly modal = inject(AppModalService);
+  protected readonly lang = inject(LanguageService);
 
   @HostListener('document:keydown.escape')
   protected onEscape(): void {

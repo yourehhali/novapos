@@ -1,4 +1,4 @@
-package com.novapos.modules.tenant.dto;
+package com.RoxPos.modules.tenant.dto;
 
 import java.util.List;
 

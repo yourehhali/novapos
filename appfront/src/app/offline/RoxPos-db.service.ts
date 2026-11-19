@@ -27,7 +27,7 @@ export interface SessionContextRecord {
 }
 
 @Injectable({ providedIn: 'root' })
-export class NovaPosDbService extends Dexie {
+export class RoxPosDbService extends Dexie {
   sessionContext!: Table<SessionContextRecord, string>;
   bootstrapSessions!: Table<BootstrapSession, string>;
   products!: Table<Product, string>;
@@ -44,7 +44,7 @@ export class NovaPosDbService extends Dexie {
   cashOpenings!: Table<CashOpening, string>;
 
   constructor() {
-    super('NovaPosDb');
+    super('RoxPosDb');
 
     this.version(1).stores({
       sessionContext: 'id',

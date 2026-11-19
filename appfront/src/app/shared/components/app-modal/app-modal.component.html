@@ -8,10 +8,12 @@
   >
     <header class="modal-header">
       <div>
-        <p class="eyebrow">Erreur d impression</p>
+        <p class="eyebrow">{{ lang.t('modal.printError') }}</p>
         <h2 id="app-modal-title">{{ current.title }}</h2>
       </div>
-      <button type="button" class="close-button" (click)="close()" aria-label="Fermer">Fermer</button>
+      <button type="button" class="close-button" (click)="close()" [attr.aria-label]="lang.t('common.close')">
+        {{ lang.t('common.close') }}
+      </button>
     </header>
 
     <div class="modal-body">
@@ -20,7 +22,7 @@
     </div>
 
     <footer class="modal-footer">
-      <button type="button" class="primary-button" (click)="close()">Compris</button>
+      <button type="button" class="primary-button" (click)="close()">{{ lang.t('common.understood') }}</button>
     </footer>
   </section>
 </div>

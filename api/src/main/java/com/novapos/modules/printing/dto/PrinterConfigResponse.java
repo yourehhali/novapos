@@ -1,4 +1,4 @@
-package com.novapos.modules.printing.dto;
+package com.RoxPos.modules.printing.dto;
 
 public record PrinterConfigResponse(
     String id,

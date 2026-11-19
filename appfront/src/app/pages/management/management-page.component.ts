@@ -12,13 +12,14 @@ import {
   ResourceStatus,
   TicketLayoutConfig,
 } from '../../core/models/app.models';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
 import { ReceiptService } from '../../core/services/receipt.service';
 import { PosService } from '../../core/services/pos.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
+import { LanguageService } from '../../core/i18n/language.service';
 
-const PIN_STORAGE_KEY = 'novapos.management.pin.authed';
+const PIN_STORAGE_KEY = 'RoxPos.management.pin.authed';
 const MANAGEMENT_PIN = '281998';
 
 type MgmtTab = 'categories' | 'products' | 'settings' | 'tables' | 'drivers';
@@ -32,11 +33,12 @@ type SettingsTicketKind = 'payment' | 'kitchen';
   imports: [CommonModule, FormsModule],
 })
 export class ManagementPageComponent implements OnInit {
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
   private readonly businessSettingsService = inject(BusinessSettingsService);
   private readonly receiptService = inject(ReceiptService);
   private readonly posService = inject(PosService);
   private readonly workspaceService = inject(WorkspaceService);
+  protected readonly lang = inject(LanguageService);
 
   protected readonly pinInput = signal('');
   protected readonly pinError = signal<string | null>(null);
@@ -94,7 +96,7 @@ export class ManagementPageComponent implements OnInit {
   async submitPin(): Promise<void> {
     const value = this.pinInput().trim();
     if (value !== MANAGEMENT_PIN) {
-      this.pinError.set('Code PIN incorrect');
+      this.pinError.set(this.lang.t('management.pinIncorrect'));
       return;
     }
     this.pinError.set(null);
@@ -273,15 +275,15 @@ export class ManagementPageComponent implements OnInit {
     const prod = this.editingProduct();
     if (!prod) return;
     if (!prod.name.trim()) {
-      this.saveError.set('Le nom du produit est requis.');
+      this.saveError.set(this.lang.t('management.productNameRequired'));
       return;
     }
     if (!prod.categoryId) {
-      this.saveError.set('Veuillez choisir une categorie.');
+      this.saveError.set(this.lang.t('management.categoryRequired'));
       return;
     }
     if (Number.isNaN(Number(prod.price)) || Number(prod.price) < 0) {
-      this.saveError.set('Le prix doit etre un nombre positif.');
+      this.saveError.set(this.lang.t('management.pricePositive'));
       return;
     }
     const finalSku = (prod.sku || '').trim() || this.autoGenerateSku(prod);
@@ -294,12 +296,14 @@ export class ManagementPageComponent implements OnInit {
       this.workspaceService.invalidateAllCachesAndEmit('catalog');
       await this.refreshProducts();
     } catch (err: unknown) {
-      this.saveError.set(`Erreur d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+      this.saveError.set(
+        this.lang.t('management.saveErrorPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 
   async deleteProduct(product: Product): Promise<void> {
-    if (!confirm(`Supprimer l article "${product.name}" ?`)) return;
+    if (!confirm(this.lang.t('management.deleteProductConfirm', { name: product.name }))) return;
     await this.db.products.delete(product.id);
     this.workspaceService.invalidateAllCachesAndEmit('catalog');
     await this.refreshProducts();
@@ -341,7 +345,7 @@ export class ManagementPageComponent implements OnInit {
     const cat = this.editingCategory();
     if (!cat) return;
     if (!cat.name.trim()) {
-      this.saveError.set('Le nom de la categorie est requis.');
+      this.saveError.set(this.lang.t('management.categoryNameRequired'));
       return;
     }
     try {
@@ -351,15 +355,17 @@ export class ManagementPageComponent implements OnInit {
       this.workspaceService.invalidateAllCachesAndEmit('catalog');
       await this.refreshCategories();
     } catch (err: unknown) {
-      this.saveError.set(`Erreur d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+      this.saveError.set(
+        this.lang.t('management.saveErrorPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 
   async deleteCategory(category: Category): Promise<void> {
     const hasProducts = this.products().some((p) => p.categoryId === category.id);
     const label = hasProducts
-      ? `Supprimer la categorie "${category.name}" et TOUS ses produits ?`
-      : `Supprimer la categorie "${category.name}" ?`;
+      ? this.lang.t('management.deleteCategoryWithProductsConfirm', { name: category.name })
+      : this.lang.t('management.deleteCategoryConfirm', { name: category.name });
     if (!confirm(label)) return;
     await this.db.transaction('rw', this.db.categories, this.db.products, async () => {
       await this.db.products.where('categoryId').equals(category.id).delete();
@@ -418,7 +424,7 @@ export class ManagementPageComponent implements OnInit {
     this.saveError.set(null);
     if (!t) return;
     if (!t.number?.trim()) {
-      this.saveError.set('Le numero de table est requis.');
+      this.saveError.set(this.lang.t('management.tableNumberRequired'));
       return;
     }
     try {
@@ -428,18 +434,22 @@ export class ManagementPageComponent implements OnInit {
       this.workspaceService.emitTablesChanged();
       await this.refreshFloorTables();
     } catch (err: unknown) {
-      this.saveError.set(`Echec d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+      this.saveError.set(
+        this.lang.t('management.saveFailedPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 
   async deleteFloorTable(t: FloorTable): Promise<void> {
-    if (!confirm(`Supprimer la table "${t.label || t.number}" ?`)) return;
+    if (!confirm(this.lang.t('management.deleteTableConfirm', { name: t.label || t.number }))) return;
     try {
       await this.posService.deleteFloorTable(t.id);
       this.workspaceService.emitTablesChanged();
       await this.refreshFloorTables();
     } catch (err: unknown) {
-      this.saveError.set(`Echec suppression : ${(err as Error)?.message ?? String(err)}`);
+      this.saveError.set(
+        this.lang.t('management.deleteFailedPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 
@@ -491,11 +501,11 @@ export class ManagementPageComponent implements OnInit {
     this.saveError.set(null);
     if (!d) return;
     if (!d.name.trim()) {
-      this.saveError.set('Le nom du livreur est requis.');
+      this.saveError.set(this.lang.t('management.driverNameRequired'));
       return;
     }
     if (!d.number?.trim()) {
-      this.saveError.set('Le numero du livreur est requis.');
+      this.saveError.set(this.lang.t('management.driverNumberRequired'));
       return;
     }
     try {
@@ -504,18 +514,22 @@ export class ManagementPageComponent implements OnInit {
       this.workspaceService.emitDriversChanged();
       await this.refreshDeliveryDrivers();
     } catch (err: unknown) {
-      this.saveError.set(`Echec d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+      this.saveError.set(
+        this.lang.t('management.saveFailedPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 
   async deleteDeliveryDriver(d: DeliveryDriver): Promise<void> {
-    if (!confirm(`Supprimer le livreur "${d.name || d.number}" ?`)) return;
+    if (!confirm(this.lang.t('management.deleteDriverConfirm', { name: d.name || d.number }))) return;
     try {
       await this.posService.deleteDeliveryDriver(d.id);
       this.workspaceService.emitDriversChanged();
       await this.refreshDeliveryDrivers();
     } catch (err: unknown) {
-      this.saveError.set(`Echec suppression : ${(err as Error)?.message ?? String(err)}`);
+      this.saveError.set(
+        this.lang.t('management.deleteFailedPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 
@@ -531,7 +545,11 @@ export class ManagementPageComponent implements OnInit {
       this.editingSettings.set({ ...loaded });
       this.saveSettingsError.set(null);
     } catch (err: unknown) {
-      this.saveSettingsError.set(`Erreur chargement parametres : ${(err as Error)?.message ?? String(err)}`);
+      this.saveSettingsError.set(
+        this.lang.t('management.settingsLoadErrorPrefix', {
+          message: (err as Error)?.message ?? String(err),
+        }),
+      );
     }
   }
 
@@ -589,25 +607,29 @@ export class ManagementPageComponent implements OnInit {
     const file = input.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      this.saveSettingsError.set('Le logo doit etre une image (PNG, JPG, etc).');
+      this.saveSettingsError.set(this.lang.t('management.logoMustBeImage'));
       return;
     }
     if (file.size > 1_500_000) {
-      this.saveSettingsError.set('L image du logo est trop volumineuse (max 1.5 Mo).');
+      this.saveSettingsError.set(this.lang.t('management.logoTooLarge'));
       return;
     }
     try {
       const reader = new FileReader();
       const dataUrl = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error ?? new Error('Echec lecture image'));
+        reader.onerror = () => reject(reader.error ?? new Error(this.lang.t('management.imageReadFailed')));
         reader.readAsDataURL(file);
       });
       this.setTicketLayoutField(kind, 'logoImageDataUrl', dataUrl);
       this.setTicketLayoutField(kind, 'logoType', 'IMAGE' as LogoType);
       this.saveSettingsError.set(null);
     } catch (err: unknown) {
-      this.saveSettingsError.set(`Echec lecture image : ${(err as Error)?.message ?? String(err)}`);
+      this.saveSettingsError.set(
+        this.lang.t('management.imageReadErrorPrefix', {
+          message: (err as Error)?.message ?? String(err),
+        }),
+      );
     } finally {
       input.value = '';
     }
@@ -639,7 +661,7 @@ export class ManagementPageComponent implements OnInit {
     if (!mode) return;
     const pin = this.clearDataPin().trim();
     if (pin !== MANAGEMENT_PIN) {
-      this.clearDataPinError.set('PIN incorrect.');
+      this.clearDataPinError.set(this.lang.t('management.clearDataPinIncorrect'));
       return;
     }
     this.clearDataPinError.set(null);
@@ -653,13 +675,17 @@ export class ManagementPageComponent implements OnInit {
       await this.loadSettings();
       this.clearDataSuccess.set(
         mode === 'BLANK'
-          ? 'Toutes les donnees locales ont ete supprimees. Vous pouvez fermer et reouvrir l app.'
-          : 'Les donnees de demonstration ont ete reinstallees.',
+          ? this.lang.t('management.clearDataBlankSuccess')
+          : this.lang.t('management.clearDataDemoSuccess'),
       );
       this.clearDataOpen.set(false);
       this.clearDataMode.set(null);
     } catch (err: unknown) {
-      this.clearDataPinError.set(`Echec reinitialisation : ${(err as Error)?.message ?? String(err)}`);
+      this.clearDataPinError.set(
+        this.lang.t('management.resetErrorPrefix', {
+          message: (err as Error)?.message ?? String(err),
+        }),
+      );
     } finally {
       this.clearDataBusy.set(false);
     }
@@ -670,25 +696,29 @@ export class ManagementPageComponent implements OnInit {
     const file = input.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      this.saveSettingsError.set('Le logo doit etre une image (PNG, JPG, etc).');
+      this.saveSettingsError.set(this.lang.t('management.logoMustBeImage'));
       return;
     }
     if (file.size > 1_500_000) {
-      this.saveSettingsError.set('L image du logo est trop volumineuse (max 1.5 Mo).');
+      this.saveSettingsError.set(this.lang.t('management.logoTooLarge'));
       return;
     }
     try {
       const reader = new FileReader();
       const dataUrl = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(reader.error ?? new Error('Echec lecture image'));
+        reader.onerror = () => reject(reader.error ?? new Error(this.lang.t('management.imageReadFailed')));
         reader.readAsDataURL(file);
       });
       this.setSettingsField('logoImageDataUrl', dataUrl);
       this.setSettingsField('logoType', 'IMAGE' as LogoType);
       this.saveSettingsError.set(null);
     } catch (err: unknown) {
-      this.saveSettingsError.set(`Echec lecture image : ${(err as Error)?.message ?? String(err)}`);
+      this.saveSettingsError.set(
+        this.lang.t('management.imageReadErrorPrefix', {
+          message: (err as Error)?.message ?? String(err),
+        }),
+      );
     } finally {
       input.value = '';
     }
@@ -706,16 +736,18 @@ export class ManagementPageComponent implements OnInit {
     const settings = this.editingSettings();
     if (!settings) return;
     if (!settings.businessName.trim()) {
-      this.saveSettingsError.set('Le nom de l entreprise est requis.');
+      this.saveSettingsError.set(this.lang.t('management.businessNameRequired'));
       return;
     }
     try {
       await this.businessSettingsService.save(settings);
       this.receiptService.invalidateSettingsCache();
       this.workspaceService.emitBusinessSettingsChanged();
-      this.saveSettingsSuccess.set('Parametres enregistres. Les prochains tiquets utiliseront ces valeurs.');
+      this.saveSettingsSuccess.set(this.lang.t('management.settingsSaved'));
     } catch (err: unknown) {
-      this.saveSettingsError.set(`Erreur d enregistrement : ${(err as Error)?.message ?? String(err)}`);
+      this.saveSettingsError.set(
+        this.lang.t('management.saveErrorPrefix', { message: (err as Error)?.message ?? String(err) }),
+      );
     }
   }
 

@@ -101,7 +101,7 @@ start_background_process() {
   fi
 }
 
-print_header "NovaPOS startup"
+print_header "RoxPos startup"
 
 require_command java
 require_command node
@@ -137,7 +137,7 @@ fi
 start_background_process "Backend API" "$API_DIR" "./mvnw spring-boot:run" "$API_PID_FILE" "$API_LOG_FILE" "8080"
 start_background_process "Frontend app" "$FRONTEND_DIR" "npm start -- --host 0.0.0.0" "$FRONTEND_PID_FILE" "$FRONTEND_LOG_FILE" "4200"
 
-print_header "NovaPOS is starting"
+print_header "RoxPos is starting"
 echo "Frontend: http://localhost:4200"
 echo "Backend:  http://localhost:8080"
 echo "Backend log:  $API_LOG_FILE"

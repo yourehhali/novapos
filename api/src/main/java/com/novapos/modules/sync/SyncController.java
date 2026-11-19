@@ -1,8 +1,8 @@
-package com.novapos.modules.sync;
+package com.RoxPos.modules.sync;
 
-import com.novapos.modules.sync.dto.SyncBatchRequest;
-import com.novapos.modules.sync.dto.SyncBatchResponse;
-import com.novapos.modules.sync.dto.SyncStatusResponse;
+import com.RoxPos.modules.sync.dto.SyncBatchRequest;
+import com.RoxPos.modules.sync.dto.SyncBatchResponse;
+import com.RoxPos.modules.sync.dto.SyncStatusResponse;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;

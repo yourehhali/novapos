@@ -233,6 +233,8 @@ export interface TicketLayoutConfig {
 export interface BusinessSettings {
   id: 'current';
   businessName: string;
+  businessNameCustomized?: boolean;
+  demoDataSignature?: string;
   addressLine1: string;
   addressLine2: string;
   phone: string;
@@ -302,4 +304,55 @@ export interface PrintTicketResult {
   success: boolean;
   message: string;
   printerName?: string;
+}
+
+export interface PocketDeviceInfo {
+  id: string;
+  label: string;
+  lastSeenAt: string;
+  orderCount: number;
+}
+
+export interface PocketServerStatus {
+  running: boolean;
+  url: string | null;
+  address: string | null;
+  port: number | null;
+  pin: string | null;
+  qrDataUrl: string | null;
+  devices: PocketDeviceInfo[];
+}
+
+export interface PocketOrderLinePayload {
+  productId: string;
+  quantity: number;
+}
+
+export interface PocketIncomingOrder {
+  requestId: string;
+  channel: OrderChannel;
+  tableNumber?: string;
+  livreurId?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  note?: string;
+  lines: PocketOrderLinePayload[];
+  deviceLabel?: string;
+}
+
+export interface PocketOrderResult {
+  ok: boolean;
+  orderId?: string;
+  orderNumber?: string;
+  total?: number;
+  error?: string;
+}
+
+export interface PocketCatalogPayload {
+  businessName: string;
+  currency: string;
+  categories: Category[];
+  products: Product[];
+  tables: FloorTable[];
+  drivers: DeliveryDriver[];
 }

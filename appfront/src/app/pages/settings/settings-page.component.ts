@@ -5,6 +5,7 @@ import {
   PrinterConfig,
   SyncStatus,
 } from '../../core/models/app.models';
+import { LanguageService } from '../../core/i18n/language.service';
 import { DesktopBridgeService } from '../../core/services/desktop-bridge.service';
 import { SyncService } from '../../core/services/sync.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
@@ -14,39 +15,39 @@ import { WorkspaceService } from '../../core/services/workspace.service';
   template: `
     <section class="settings-grid">
       <article class="panel">
-        <p class="eyebrow">Poste</p>
-        <h1>Runtime desktop</h1>
+        <p class="eyebrow">{{ lang.t('settings.poste') }}</p>
+        <h1>{{ lang.t('settings.runtimeDesktop') }}</h1>
 
         <div class="setting-card" *ngIf="runtimeInfo() as runtime; else browserRuntime">
           <div class="setting-head">
             <strong>{{ runtime.platform }}</strong>
-            <span class="badge">{{ runtime.packaged ? 'Packaged' : 'Dev' }}</span>
+            <span class="badge">{{ runtime.packaged ? lang.t('settings.buildPackaged') : lang.t('settings.buildDev') }}</span>
           </div>
-          <p>Version {{ runtime.version }} · impression locale directe active</p>
+          <p>{{ lang.t('settings.runtimeVersion', { version: runtime.version }) }}</p>
         </div>
 
         <ng-template #browserRuntime>
           <div class="setting-card">
             <div class="setting-head">
-              <strong>Navigateur web</strong>
-              <span class="badge">Fallback</span>
+              <strong>{{ lang.t('settings.webBrowser') }}</strong>
+              <span class="badge">{{ lang.t('settings.fallback') }}</span>
             </div>
-            <p>Les impressions passent encore par la fenetre d'impression du navigateur.</p>
+            <p>{{ lang.t('settings.browserPrintHelp') }}</p>
           </div>
         </ng-template>
 
         <div class="setting-card" *ngIf="desktopPrinters().length > 0">
-          <strong>Imprimantes systeme detectees</strong>
+          <strong>{{ lang.t('settings.systemPrintersDetected') }}</strong>
           <p *ngFor="let printer of desktopPrinters()">
             {{ printer.displayName || printer.name }}<br />
-            <span class="muted-line">{{ printer.isDefault ? 'Par defaut' : 'Disponible' }}</span>
+            <span class="muted-line">{{ printer.isDefault ? lang.t('settings.defaultPrinter') : lang.t('settings.available') }}</span>
           </p>
         </div>
       </article>
 
       <article class="panel">
-        <p class="eyebrow">Impression</p>
-        <h1>Routage imprimantes</h1>
+        <p class="eyebrow">{{ lang.t('settings.printing') }}</p>
+        <h1>{{ lang.t('settings.printerRouting') }}</h1>
 
         <div class="setting-card" *ngFor="let printer of printers()">
           <div class="setting-head">
@@ -55,12 +56,12 @@ import { WorkspaceService } from '../../core/services/workspace.service';
           </div>
           <p>{{ printer.protocol }} · {{ printer.queueName }}</p>
           <p class="muted-line">
-            Largeur {{ printer.paperWidthMm || 80 }}mm ·
+            {{ lang.t('settings.widthLabel', { width: printer.paperWidthMm || 80 }) }} ·
             {{ printer.printMode || 'THERMAL' }} ·
-            {{ printer.silent === false ? 'Dialogue visible' : 'Silencieux' }}
+            {{ printer.silent === false ? lang.t('settings.dialogVisible') : lang.t('settings.silent') }}
           </p>
           <p class="muted-line">
-            Routage local:
+            {{ lang.t('settings.localRouting') }}
             {{ printer.systemPrinterName || printer.name || printer.queueName }}
           </p>
           <p class="muted-line">{{ desktopMatch(printer) }}</p>
@@ -68,20 +69,22 @@ import { WorkspaceService } from '../../core/services/workspace.service';
       </article>
 
       <article class="panel">
-        <p class="eyebrow">Synchronisation</p>
-        <h1>Visibilite synchro</h1>
+        <p class="eyebrow">{{ lang.t('settings.sync') }}</p>
+        <h1>{{ lang.t('settings.syncVisibility') }}</h1>
 
         <div class="setting-card" *ngIf="syncStatus() as status">
-          <strong>Evenements acceptes</strong>
+          <strong>{{ lang.t('settings.acceptedEvents') }}</strong>
           <p>{{ status.acceptedEvents }}</p>
-          <strong>Doublons</strong>
+          <strong>{{ lang.t('settings.duplicates') }}</strong>
           <p>{{ status.duplicateEvents }}</p>
-          <strong>Conflits en attente</strong>
+          <strong>{{ lang.t('settings.pendingConflicts') }}</strong>
           <p>{{ status.pendingConflicts }}</p>
         </div>
 
-        <button type="button" (click)="runManualSync()">Lancer la synchro manuelle</button>
+        <button type="button" (click)="runManualSync()">{{ lang.t('settings.runManualSync') }}</button>
       </article>
+
+      <app-pocket-panel></app-pocket-panel>
     </section>
   `,
   styles: [
@@ -172,6 +175,7 @@ export class SettingsPageComponent implements OnInit {
   private readonly workspaceService = inject(WorkspaceService);
   private readonly desktopBridge = inject(DesktopBridgeService);
   private readonly syncService = inject(SyncService);
+  protected readonly lang = inject(LanguageService);
 
   protected readonly printers = signal<PrinterConfig[]>([]);
   protected readonly runtimeInfo = signal<DesktopRuntimeInfo | null>(null);
@@ -199,7 +203,7 @@ export class SettingsPageComponent implements OnInit {
 
   protected desktopMatch(printer: PrinterConfig): string {
     if (!this.runtimeInfo()) {
-      return 'Correspondance systeme indisponible hors mode desktop.';
+      return this.lang.t('settings.desktopMatchUnavailable');
     }
 
     const candidates = [printer.systemPrinterName, printer.name, printer.queueName]
@@ -214,7 +218,7 @@ export class SettingsPageComponent implements OnInit {
     });
 
     return match
-      ? `Correspondance detectee: ${match.displayName || match.name}`
-      : 'Aucune imprimante systeme correspondante detectee.';
+      ? this.lang.t('settings.desktopMatchFound', { name: match.displayName || match.name })
+      : this.lang.t('settings.desktopMatchNone');
   }
 }

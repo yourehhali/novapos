@@ -1,12 +1,13 @@
 import { Component, inject } from '@angular/core';
+import { LanguageService } from '../../core/i18n/language.service';
 import { SessionService } from '../../core/services/session.service';
 
 @Component({
   selector: 'app-admin-users-page',
   template: `
     <section class="panel">
-      <p class="eyebrow">Administration utilisateurs</p>
-      <h1>Perimetre operateur actuel</h1>
+      <p class="eyebrow">{{ lang.t('admin.usersEyebrow') }}</p>
+      <h1>{{ lang.t('admin.operatorScope') }}</h1>
       <article class="user-card">
         <strong>{{ session.user()?.displayName }}</strong>
         <p>{{ session.user()?.roles?.join(', ') }}</p>
@@ -29,4 +30,5 @@ import { SessionService } from '../../core/services/session.service';
 })
 export class AdminUsersPageComponent {
   protected readonly session = inject(SessionService);
+  protected readonly lang = inject(LanguageService);
 }

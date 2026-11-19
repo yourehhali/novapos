@@ -19,7 +19,7 @@ require_command() {
   fi
 }
 
-print_header "NovaPOS update"
+print_header "RoxPos update"
 
 require_command node
 require_command npm
@@ -43,4 +43,4 @@ print_header "Packaging latest macOS desktop build"
 
 print_header "Update complete"
 echo "Latest macOS artifacts:"
-ls -lh "$RELEASE_DIR"/NovaPOS-*.dmg "$RELEASE_DIR"/NovaPOS-*-mac.zip
+ls -lh "$RELEASE_DIR"/RoxPos-*.dmg "$RELEASE_DIR"/RoxPos-*-mac.zip

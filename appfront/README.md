@@ -1,4 +1,4 @@
-# NovaPOS Frontend
+# RoxPos Frontend
 
 Use the repository root README for demo accounts, seeded products, startup instructions, and test steps:
 

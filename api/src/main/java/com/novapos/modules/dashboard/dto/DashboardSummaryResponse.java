@@ -1,4 +1,4 @@
-package com.novapos.modules.dashboard.dto;
+package com.RoxPos.modules.dashboard.dto;
 
 import java.math.BigDecimal;
 import java.util.List;

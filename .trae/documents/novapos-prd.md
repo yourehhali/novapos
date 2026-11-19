@@ -1,6 +1,6 @@
 ## 1. Product Overview
 
-NovaPOS is an enterprise SaaS Point of Sale platform for Morocco-first food and retail businesses, designed to continue operating normally during internet outages through an offline-first architecture.
+RoxPos is an enterprise SaaS Point of Sale platform for Morocco-first food and retail businesses, designed to continue operating normally during internet outages through an offline-first architecture.
 
 - The product serves restaurants, cafes, coffee shops, bakeries, snack shops, fast food, retail stores, grocery stores, and supermarkets.
 - The business value is uninterrupted sales operations, centralized multi-branch management, and a future-ready SaaS platform that can expand globally.
@@ -55,7 +55,7 @@ NovaPOS is an enterprise SaaS Point of Sale platform for Morocco-first food and 
 
 ## 3. Core Process
 
-The first production-ready slice of NovaPOS must allow a branch to authenticate, load its local workspace, conduct sales locally, persist all business actions as immutable events, and synchronize automatically when connectivity is available. The cashier experience must remain fast and uninterrupted whether the branch is online or offline.
+The first production-ready slice of RoxPos must allow a branch to authenticate, load its local workspace, conduct sales locally, persist all business actions as immutable events, and synchronize automatically when connectivity is available. The cashier experience must remain fast and uninterrupted whether the branch is online or offline.
 
 The primary operator journey is:
 

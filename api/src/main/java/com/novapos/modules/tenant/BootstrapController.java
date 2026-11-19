@@ -1,7 +1,7 @@
-package com.novapos.modules.tenant;
+package com.RoxPos.modules.tenant;
 
-import com.novapos.modules.shared.SampleDataService;
-import com.novapos.modules.tenant.dto.BootstrapSessionResponse;
+import com.RoxPos.modules.shared.SampleDataService;
+import com.RoxPos.modules.tenant.dto.BootstrapSessionResponse;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;

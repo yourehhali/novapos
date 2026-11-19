@@ -35,7 +35,7 @@ body {
 }
 
 body {
-  min-height: 100vh;
+  min-height: 100svh;
   line-height: 1.4;
 }
 
@@ -90,4 +90,21 @@ a {
 ::-webkit-scrollbar-thumb {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.14);
+}
+
+/* Every routed page fills the shell content area so screens are at least 100svh tall. */
+app-dashboard-page,
+app-pos-page,
+app-service-page,
+app-orders-page,
+app-management-page,
+app-settings-page,
+app-order-history-page,
+app-admin-branches-page,
+app-admin-business-page,
+app-admin-users-page,
+app-branch-select-page {
+  display: block;
+  flex: 1 0 auto;
+  min-height: 0;
 }

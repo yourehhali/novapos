@@ -1,4 +1,4 @@
-package com.novapos.modules.sync.dto;
+package com.RoxPos.modules.sync.dto;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;

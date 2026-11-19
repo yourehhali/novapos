@@ -1,22 +1,24 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { ApiService } from './api.service';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 import { NetworkService } from './network.service';
 import { SessionService } from './session.service';
+import { LanguageService } from '../i18n/language.service';
 import { isOfflineDemoToken } from '../demo/offline-demo.data';
 
 @Injectable({ providedIn: 'root' })
 export class SyncService {
   private static readonly SYNC_TIMEOUT_MS = 1500;
   private readonly api = inject(ApiService);
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
   private readonly network = inject(NetworkService);
   private readonly session = inject(SessionService);
+  protected readonly lang = inject(LanguageService);
   private scheduledSync: ReturnType<typeof setTimeout> | null = null;
   private periodicSync: ReturnType<typeof setInterval> | null = null;
 
-  readonly syncMessage = signal('En attente');
+  readonly syncMessage = signal(this.lang.t('services.pending'));
   readonly syncInFlight = signal(false);
 
   scheduleSync(delayMs = 0): void {
@@ -50,7 +52,7 @@ export class SyncService {
     }
 
     if (isOfflineDemoToken(token)) {
-      this.syncMessage.set('Mode demo local. Les evenements restent sur cet appareil.');
+      this.syncMessage.set(this.lang.t('services.demoModeLocalEvents'));
       return;
     }
 
@@ -64,12 +66,12 @@ export class SyncService {
       .sortBy('deviceSequence');
 
     if (queue.length === 0) {
-      this.syncMessage.set('La file locale est synchronisee');
+      this.syncMessage.set(this.lang.t('services.localQueueSynced'));
       return;
     }
 
     this.syncInFlight.set(true);
-    this.syncMessage.set(`Synchronisation de ${queue.length} evenements en attente`);
+    this.syncMessage.set(this.lang.t('services.syncingPendingEvents', { count: queue.length }));
 
     try {
       const lastCursor = await this.db.syncCursors.get(branch.deviceCode);
@@ -113,10 +115,13 @@ export class SyncService {
       });
 
       this.syncMessage.set(
-        `${response.acceptedEventUuids.length} acceptes, ${response.duplicateEventUuids.length} doublons`,
+        this.lang.t('services.syncAcceptedDuplicates', {
+          accepted: response.acceptedEventUuids.length,
+          duplicates: response.duplicateEventUuids.length,
+        }),
       );
     } catch {
-      this.syncMessage.set('Synchro en pause. La file locale reste securisee sur cet appareil.');
+      this.syncMessage.set(this.lang.t('services.syncPaused'));
     } finally {
       this.syncInFlight.set(false);
     }

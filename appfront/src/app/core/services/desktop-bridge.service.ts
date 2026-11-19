@@ -2,6 +2,10 @@ import { Injectable } from '@angular/core';
 import {
   DesktopPrinterInfo,
   DesktopRuntimeInfo,
+  PocketCatalogPayload,
+  PocketIncomingOrder,
+  PocketOrderResult,
+  PocketServerStatus,
   PrintSalesSummaryRequest,
   PrintTicketRequest,
   PrintTicketResult,
@@ -14,7 +18,7 @@ export class DesktopBridgeService {
       return false;
     }
 
-    if (typeof window.novaPosDesktop !== 'undefined') {
+    if (typeof window.RoxPosDesktop !== 'undefined') {
       return true;
     }
 
@@ -22,7 +26,7 @@ export class DesktopBridgeService {
   }
 
   async getRuntimeInfo(): Promise<DesktopRuntimeInfo | null> {
-    const bridge = window.novaPosDesktop;
+    const bridge = window.RoxPosDesktop;
     if (!bridge) {
       return null;
     }
@@ -31,7 +35,7 @@ export class DesktopBridgeService {
   }
 
   async listPrinters(): Promise<DesktopPrinterInfo[]> {
-    const bridge = window.novaPosDesktop;
+    const bridge = window.RoxPosDesktop;
     if (!bridge) {
       return [];
     }
@@ -40,7 +44,7 @@ export class DesktopBridgeService {
   }
 
   async printTicket(request: PrintTicketRequest): Promise<PrintTicketResult | null> {
-    const bridge = window.novaPosDesktop;
+    const bridge = window.RoxPosDesktop;
     if (!bridge) {
       return null;
     }
@@ -49,11 +53,83 @@ export class DesktopBridgeService {
   }
 
   async printSalesSummary(request: PrintSalesSummaryRequest): Promise<PrintTicketResult | null> {
-    const bridge = window.novaPosDesktop;
+    const bridge = window.RoxPosDesktop;
     if (!bridge) {
       return null;
     }
 
     return bridge.printSalesSummary(request);
+  }
+
+  async getPocketStatus(): Promise<PocketServerStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.getPocketStatus();
+  }
+
+  async startPocketServer(): Promise<PocketServerStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.startPocketServer();
+  }
+
+  async stopPocketServer(): Promise<PocketServerStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.stopPocketServer();
+  }
+
+  async regeneratePocketPin(): Promise<PocketServerStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.regeneratePocketPin();
+  }
+
+  async pushPocketData(payload: PocketCatalogPayload): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.pushPocketData(payload);
+  }
+
+  async resolvePocketOrder(requestId: string, result: PocketOrderResult): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.resolvePocketOrder(requestId, result);
+  }
+
+  onPocketOrder(listener: (order: PocketIncomingOrder) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onPocketOrder(listener);
+  }
+
+  onPocketStatus(listener: (status: PocketServerStatus) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onPocketStatus(listener);
   }
 }

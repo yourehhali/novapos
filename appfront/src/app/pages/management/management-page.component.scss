@@ -1,6 +1,8 @@
 .management-page {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
+  min-height: 100%;
   padding: 18px 22px 28px;
 }
 
@@ -44,12 +46,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 62vh;
+  flex: 1;
+  min-height: 0;
   padding: 20px 0;
 }
 
 .pin-card {
-  width: min(420px, 100%);
+  width: 100%;
   padding: 26px 24px;
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -613,7 +616,7 @@
   position: relative;
   z-index: 1;
   width: min(540px, 100%);
-  max-height: calc(100vh - 48px);
+  max-height: calc(100svh - 48px);
   background: var(--surface);
   border: 1px solid var(--surface-border);
   border-radius: var(--radius-lg);
@@ -669,7 +672,7 @@
 .modal-shell-body {
   display: grid;
   gap: 12px;
-  max-height: 60vh;
+  max-height: 60svh;
   overflow: auto;
 }
 

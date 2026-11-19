@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0c0e10" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>RoxPos · Caisse mobile</title>
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow" id="brand-label">Caisse mobile</p>
+          <h1 id="brand-name">RoxPos</h1>
+        </div>
+        <button type="button" class="ghost" id="reset-btn" hidden>Changer d'appareil</button>
+      </header>
+
+      <!-- Pairing -->
+      <section class="screen" id="screen-pair">
+        <div class="card">
+          <h2>Connexion a la caisse</h2>
+          <p class="muted">
+            Saisissez le code affiche sur la caisse de l'etablissement. Cet appareil restera
+            connecte tant qu'il est sur le meme reseau.
+          </p>
+          <label class="field">
+            <span>Code de couplage</span>
+            <input id="pin-input" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" />
+          </label>
+          <label class="field">
+            <span>Nom de l'appareil (optionnel)</span>
+            <input id="label-input" type="text" maxlength="40" placeholder="Ex: Salle 1" />
+          </label>
+          <button type="button" class="primary" id="pair-btn">Se connecter</button>
+          <p class="error" id="pair-error" hidden></p>
+        </div>
+      </section>
+
+      <!-- Menu -->
+      <section class="screen hidden" id="screen-menu">
+        <nav class="chips" id="category-chips"></nav>
+        <div class="product-list" id="product-list"></div>
+      </section>
+
+      <!-- Checkout -->
+      <section class="screen hidden" id="screen-checkout">
+        <div class="card">
+          <h2>Finaliser la commande</h2>
+          <div class="chips" id="channel-chips">
+            <button type="button" class="chip" data-channel="SUR_PLACE">Sur place</button>
+            <button type="button" class="chip" data-channel="EMPORTER">A emporter</button>
+            <button type="button" class="chip" data-channel="LIVRAISON">Livraison</button>
+          </div>
+
+          <label class="field" id="table-field" hidden>
+            <span>Table</span>
+            <select id="table-select"></select>
+          </label>
+
+          <label class="field" id="driver-field" hidden>
+            <span>Livreur</span>
+            <select id="driver-select"></select>
+          </label>
+
+          <label class="field" id="phone-field" hidden>
+            <span>Telephone client</span>
+            <input id="phone-input" type="tel" inputmode="tel" placeholder="06 00 00 00 00" />
+          </label>
+
+          <label class="field" id="address-field" hidden>
+            <span>Adresse de livraison</span>
+            <input id="address-input" type="text" placeholder="Rue, numero, etage" />
+          </label>
+
+          <label class="field">
+            <span>Note (optionnel)</span>
+            <input id="note-input" type="text" maxlength="120" placeholder="Sans oignons..." />
+          </label>
+
+          <button type="button" class="primary" id="submit-btn">Envoyer a la caisse</button>
+          <p class="error" id="submit-error" hidden></p>
+        </div>
+      </section>
+
+      <!-- Done -->
+      <section class="screen hidden" id="screen-done">
+        <div class="card center">
+          <div class="check">&#10003;</div>
+          <h2>Commande envoyee</h2>
+          <p class="muted" id="done-detail"></p>
+          <button type="button" class="primary" id="again-btn">Nouvelle commande</button>
+        </div>
+      </section>
+
+      <!-- Cart bar -->
+      <div class="cartbar" id="cartbar" hidden>
+        <div class="cartbar-info">
+          <span id="cart-count">0 article</span>
+          <strong id="cart-total">0.00 DH</strong>
+        </div>
+        <div class="cartbar-actions">
+          <button type="button" class="ghost" id="clear-btn">Vider</button>
+          <button type="button" class="primary" id="checkout-btn">Commander</button>
+        </div>
+      </div>
+    </div>
+    <script src="./app.js"></script>
+  </body>
+</html>

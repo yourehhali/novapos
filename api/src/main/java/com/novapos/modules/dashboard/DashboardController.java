@@ -1,7 +1,7 @@
-package com.novapos.modules.dashboard;
+package com.RoxPos.modules.dashboard;
 
-import com.novapos.modules.dashboard.dto.DashboardSummaryResponse;
-import com.novapos.modules.shared.SampleDataService;
+import com.RoxPos.modules.dashboard.dto.DashboardSummaryResponse;
+import com.RoxPos.modules.shared.SampleDataService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;

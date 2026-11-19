@@ -3,19 +3,19 @@
     <div class="invoice-card">
       <div class="invoice-header">
         <div>
-          <p class="eyebrow">Ticket commande</p>
-          <h1>Commande en cours</h1>
+          <p class="eyebrow">{{ lang.t('pos.ticketOrder') }}</p>
+          <h1>{{ lang.t('pos.currentOrder') }}</h1>
         </div>
       </div>
 
       <div class="editing-banner" *ngIf="pos.editingPreparedOrderId() && pos.lastOrder()">
-        <strong>Modification en cours</strong>
-        <span>Vous editez la commande {{ pos.lastOrder()!.orderNumber }}. Vos modifications remplaceront la commande existante.</span>
-        <button type="button" class="cancel-edit-button" (click)="pos.clearCart()">Annuler</button>
+        <strong>{{ lang.t('pos.editingBanner') }}</strong>
+        <span>{{ lang.t('pos.editingOrderNotice', { orderNumber: pos.lastOrder()!.orderNumber }) }}</span>
+        <button type="button" class="cancel-edit-button" (click)="pos.clearCart()">{{ lang.t('common.cancel') }}</button>
       </div>
 
       <div class="channel-section">
-        <p class="eyebrow channel-eyebrow">Type de commande</p>
+        <p class="eyebrow channel-eyebrow">{{ lang.t('pos.orderType') }}</p>
         <div class="channel-row">
           <button
             type="button"
@@ -23,7 +23,7 @@
             [class.active]="pos.channel() === 'SUR_PLACE'"
             (click)="setChannel('SUR_PLACE')"
           >
-            Sur place
+            {{ lang.t('pos.dineIn') }}
           </button>
           <button
             type="button"
@@ -31,7 +31,7 @@
             [class.active]="pos.channel() === 'EMPORTER'"
             (click)="setChannel('EMPORTER')"
           >
-            A emporter
+            {{ lang.t('pos.takeaway') }}
           </button>
           <button
             type="button"
@@ -39,24 +39,24 @@
             [class.active]="pos.channel() === 'LIVRAISON'"
             (click)="setChannel('LIVRAISON')"
           >
-            Livraison
+            {{ lang.t('pos.delivery') }}
           </button>
         </div>
 
         <div class="channel-context" *ngIf="pos.channel() === 'SUR_PLACE'">
           <label>
-            <span>Table</span>
+            <span>{{ lang.t('pos.table') }}</span>
             <select
               [ngModel]="pos.selectedTableNumber()"
               (ngModelChange)="setSelectedTableNumber($event)"
             >
-              <option value="">-- Selectionnez une table --</option>
+              <option value="">{{ lang.t('pos.selectTable') }}</option>
               <ng-container *ngFor="let t of floorTables()">
                 <option
                   *ngIf="t.status === 'ACTIVE'"
                   [ngValue]="t.number"
                 >
-                  Table {{ t.number }} &middot; {{ t.label || (t.zone || 'Salle') }} &middot; {{ t.capacity }} pax
+                  {{ lang.t('pos.table') }} {{ t.number }} &middot; {{ t.label || (t.zone || lang.t('pos.hall')) }} &middot; {{ t.capacity }} pax
                 </option>
               </ng-container>
             </select>
@@ -65,12 +65,12 @@
 
         <div class="channel-context" *ngIf="pos.channel() === 'LIVRAISON'">
           <label>
-            <span>Livreur *</span>
+            <span>{{ lang.t('pos.driver') }} *</span>
             <select
               [ngModel]="pos.selectedLivreurId()"
               (ngModelChange)="setSelectedLivreurId($event)"
             >
-              <option value="">-- Selectionnez un livreur --</option>
+              <option value="">{{ lang.t('pos.selectDriver') }}</option>
               <option *ngFor="let d of deliveryDrivers()" [ngValue]="d.id">
                 N°{{ d.number }} &middot; {{ d.name }}
                 <ng-container *ngIf="d.vehicle"> ({{ d.vehicle }})</ng-container>
@@ -78,7 +78,7 @@
             </select>
           </label>
           <label>
-            <span>Telephone client (optionnel)</span>
+            <span>{{ lang.t('pos.customerPhoneOptional') }}</span>
             <input
               type="text"
               placeholder="Ex: +212 600 000 000"
@@ -87,7 +87,7 @@
             />
           </label>
           <label>
-            <span>Adresse de livraison (optionnel)</span>
+            <span>{{ lang.t('pos.deliveryAddressOptional') }}</span>
             <input
               type="text"
               placeholder="Ex: 12 rue de la Gare, Maarif, Casablanca"
@@ -99,7 +99,7 @@
 
         <div class="channel-context" *ngIf="pos.channel() === 'EMPORTER'">
           <label>
-            <span>Telephone client (optionnel)</span>
+            <span>{{ lang.t('pos.customerPhoneOptional') }}</span>
             <input
               type="text"
               placeholder="Ex: +212 600 000 000"
@@ -131,14 +131,14 @@
 
       <ng-template #emptyCart>
         <div class="empty-state">
-          <p>Aucun article ajoute.</p>
-          <span>Choisissez des articles du catalogue pour commencer cette commande.</span>
+          <p>{{ lang.t('pos.emptyCart') }}</p>
+          <span>{{ lang.t('pos.emptyCartHint') }}</span>
         </div>
       </ng-template>
 
       <div class="summary-card">
         <div>
-          <span>Total</span>
+          <span>{{ lang.t('common.total') }}</span>
           <strong>{{ pos.subtotal() | number: '1.2-2' }} DH</strong>
         </div>
       </div>
@@ -146,24 +146,24 @@
 
     <div class="cart-footer">
       <button type="button" class="ghost-button" [disabled]="pos.cart().length === 0" (click)="pos.clearCart()">
-        Vider
+        {{ lang.t('pos.clear') }}
       </button>
       <button type="button" class="checkout-button" [disabled]="busy() || pos.cart().length === 0" (click)="prepare()">
-        {{ busy() ? (pos.editingPreparedOrderId() ? 'Mise a jour...' : 'Preparation...') : (pos.editingPreparedOrderId() ? 'Mettre a jour' : 'Preparer') }}
+        {{ busy() ? (pos.editingPreparedOrderId() ? lang.t('pos.updating') : lang.t('pos.preparing')) : (pos.editingPreparedOrderId() ? lang.t('pos.update') : lang.t('pos.prepare')) }}
       </button>
     </div>
 
     <div class="receipt-card" *ngIf="pos.lastOrder() as lastOrder">
       <div class="receipt-head">
         <div>
-          <p class="eyebrow">Derniere commande</p>
+          <p class="eyebrow">{{ lang.t('pos.lastOrderHeading') }}</p>
           <h3>{{ lastOrder.orderNumber }}</h3>
         </div>
         <span class="badge" [class.paid]="lastOrder.status === 'PAID'">{{ statusLabel(lastOrder.status) }}</span>
       </div>
-      <p>{{ lastOrder.total | number: '1.2-2' }} DH · {{ lastOrder.lineCount }} lignes</p>
+      <p>{{ lastOrder.total | number: '1.2-2' }} DH · {{ lastOrder.lineCount }} {{ lang.t('common.lines') }}</p>
       <button type="button" class="secondary-button" (click)="printLastOrder()">
-        {{ lastOrder.status === 'PAID' ? 'Imprimer ticket paiement' : 'Imprimer ticket cuisine' }}
+        {{ lastOrder.status === 'PAID' ? lang.t('pos.printPaymentTicket') : lang.t('pos.printKitchenTicket') }}
       </button>
     </div>
   </article>
@@ -171,14 +171,14 @@
   <article class="catalog-panel">
     <div class="catalog-toolbar">
       <div>
-        <p class="eyebrow">Catalogue</p>
-        <h2>Menu comptoir</h2>
+        <p class="eyebrow">{{ lang.t('pos.catalog') }}</p>
+        <h2>{{ lang.t('pos.counterMenu') }}</h2>
       </div>
 
       <input
         [ngModel]="searchTerm()"
         (ngModelChange)="searchTerm.set($event)"
-        placeholder="Rechercher un article ou SKU"
+        [placeholder]="lang.t('pos.searchPlaceholder')"
       />
     </div>
 
@@ -186,8 +186,8 @@
       <button type="button" class="category-card" [class.active]="selectedCategory() === 'all'" (click)="selectedCategory.set('all')">
         <span class="category-icon">A</span>
         <div class="category-info">
-          <strong>Tous les articles</strong>
-          <p>{{ products().length }} articles</p>
+          <strong>{{ lang.t('pos.allArticles') }}</strong>
+          <p>{{ products().length }} {{ lang.t('common.articles') }}</p>
         </div>
       </button>
 
@@ -201,7 +201,7 @@
         <span class="category-icon">{{ category.name.charAt(0) }}</span>
         <div class="category-info">
           <strong>{{ category.name }}</strong>
-            <p>{{ productCountForCategory(category.id) }} articles</p>
+            <p>{{ productCountForCategory(category.id) }} {{ lang.t('common.articles') }}</p>
         </div>
       </button>
     </div>

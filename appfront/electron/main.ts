@@ -5,6 +5,13 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import {
+  PocketServer,
+  type PocketCatalogPayload,
+  type PocketOrderRequest,
+  type PocketOrderResult,
+  type PocketServerStatus,
+} from './pocket-server';
 
 type TicketKind = 'KITCHEN' | 'PAYMENT';
 
@@ -228,7 +235,7 @@ const BUSINESS_NAME = 'Rox Agency';
 const WIFI_PASSWORD = 'ladiesfirst';
 const BUNDLED_LOGO_PATH = path.join('electron', 'assets', 'logo-black.png');
 const BUNDLED_APP_ICON_PATH = path.join('media', 'icon.png');
-const WORKSPACE_LOGO_PATH = '/Users/macadmin/Documents/pos.rox.ma/POS/HoleMole/auth/logo-black.png';
+const WORKSPACE_LOGO_PATH = '/Users/macadmin/Documents/pos.rox.ma/POS/AlmaniNafris/auth/logo-black.png';
 
 let cachedTicketLogo: Electron.NativeImage | null | undefined;
 let cachedAppIcon: Electron.NativeImage | null | undefined;
@@ -271,7 +278,7 @@ function createMainWindow(): BrowserWindow {
     },
   });
 
-  const rendererUrl = process.env['NOVAPOS_RENDERER_URL'];
+  const rendererUrl = process.env['RoxPos_RENDERER_URL'];
   const rendererIndex = path.join(app.getAppPath(), 'dist', 'appfront', 'browser', 'index.html');
 
   if (rendererUrl) {
@@ -296,15 +303,103 @@ function createMainWindow(): BrowserWindow {
   return window;
 }
 
+let pocketServer: PocketServer | null = null;
+const pendingPocketOrders = new Map<string, (result: PocketOrderResult) => void>();
+
+function emptyPocketStatus(): PocketServerStatus {
+  return {
+    running: false,
+    url: null,
+    address: null,
+    port: null,
+    pin: null,
+    qrDataUrl: null,
+    devices: [],
+  };
+}
+
+function pocketStaticDir(): string {
+  return path.join(app.getAppPath(), 'dist', 'appfront', 'browser', 'pocket');
+}
+
+function ensurePocketServer(): PocketServer {
+  if (pocketServer) {
+    return pocketServer;
+  }
+
+  pocketServer = new PocketServer({
+    staticDir: pocketStaticDir(),
+    handleOrder: (order, meta) => requestRendererOrder(order, meta),
+    onStatusChange: (status) => {
+      mainWindow?.webContents.send('RoxPos:pocket-status', status);
+    },
+  });
+
+  return pocketServer;
+}
+
+function requestRendererOrder(
+  order: PocketOrderRequest,
+  meta: { requestId: string; deviceLabel: string },
+): Promise<PocketOrderResult> {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) {
+    return Promise.resolve({ ok: false, error: 'Caisse indisponible.' });
+  }
+
+  return new Promise<PocketOrderResult>((resolve) => {
+    pendingPocketOrders.set(meta.requestId, resolve);
+    window.webContents.send('RoxPos:pocket-order', {
+      requestId: meta.requestId,
+      channel: order.channel,
+      tableNumber: order.tableNumber,
+      livreurId: order.livreurId,
+      customerPhone: order.customerPhone,
+      deliveryAddress: order.deliveryAddress,
+      note: order.note,
+      lines: order.lines,
+      deviceLabel: meta.deviceLabel,
+    });
+  });
+}
+
+function registerPocketApi(): void {
+  ipcMain.handle('RoxPos:pocket-start', async () => ensurePocketServer().start());
+  ipcMain.handle('RoxPos:pocket-stop', async () =>
+    pocketServer ? pocketServer.stop() : emptyPocketStatus(),
+  );
+  ipcMain.handle('RoxPos:pocket-status', () =>
+    pocketServer ? pocketServer.status() : emptyPocketStatus(),
+  );
+  ipcMain.handle('RoxPos:pocket-regenerate-pin', () =>
+    pocketServer ? pocketServer.regeneratePin() : emptyPocketStatus(),
+  );
+  ipcMain.handle('RoxPos:pocket-push-data', (_event, payload: PocketCatalogPayload) => {
+    ensurePocketServer().setCatalog(payload);
+    return { ok: true };
+  });
+  ipcMain.handle(
+    'RoxPos:pocket-resolve-order',
+    (_event, requestId: string, result: PocketOrderResult) => {
+      const resolve = pendingPocketOrders.get(requestId);
+      if (resolve) {
+        pendingPocketOrders.delete(requestId);
+        resolve(result);
+      }
+      return { ok: true };
+    },
+  );
+}
+
 function registerDesktopApi(): void {
-  ipcMain.handle('novapos:desktop-info', async () => ({
+  ipcMain.handle('RoxPos:desktop-info', async () => ({
     isDesktop: true,
     platform: process.platform,
     version: app.getVersion(),
     packaged: app.isPackaged,
   }));
 
-  ipcMain.handle('novapos:list-printers', async () => {
+  ipcMain.handle('RoxPos:list-printers', async () => {
     if (!mainWindow) {
       return [];
     }
@@ -320,10 +415,10 @@ function registerDesktopApi(): void {
     }));
   });
 
-  ipcMain.handle('novapos:print-ticket', async (_event, request: PrintTicketRequest) =>
+  ipcMain.handle('RoxPos:print-ticket', async (_event, request: PrintTicketRequest) =>
     printTicket(request),
   );
-  ipcMain.handle('novapos:print-sales-summary', async (_event, request: PrintSalesSummaryRequest) =>
+  ipcMain.handle('RoxPos:print-sales-summary', async (_event, request: PrintSalesSummaryRequest) =>
     printSalesSummary(request),
   );
 }
@@ -487,7 +582,7 @@ async function sendToSystemPrinterQueue(
 ): Promise<void> {
   const tempFilePath = path.join(
     os.tmpdir(),
-    `novapos-escpos-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`,
+    `RoxPos-escpos-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`,
   );
 
   await writeFile(tempFilePath, payload);
@@ -580,7 +675,7 @@ public static class RawPrinterHelper {
 
     try {
       DOCINFOA docInfo = new DOCINFOA();
-      docInfo.pDocName = "NovaPOS ESC_POS";
+      docInfo.pDocName = "RoxPos ESC_POS";
       docInfo.pDataType = "RAW";
 
       if (StartDocPrinter(printerHandle, 1, docInfo) == 0) {
@@ -1616,6 +1711,7 @@ function escapeHtml(value: string): string {
 
 app.whenReady().then(() => {
   registerDesktopApi();
+  registerPocketApi();
   mainWindow = createMainWindow();
 
   app.on('activate', () => {
@@ -1629,4 +1725,8 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('before-quit', () => {
+  void pocketServer?.stop();
 });

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, timeout } from 'rxjs';
 import { ApiService } from './api.service';
 import { SessionService } from './session.service';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 import { AuthSessionResponse, BootstrapSession } from '../models/app.models';
 import {
   getDefaultOfflineAuthSession,
@@ -16,7 +16,7 @@ export class AuthService {
   private static readonly AUTH_TIMEOUT_MS = 1200;
   private readonly api = inject(ApiService);
   private readonly session = inject(SessionService);
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
 
   async login(login: string, password: string): Promise<AuthSessionResponse> {
     let response: AuthSessionResponse;

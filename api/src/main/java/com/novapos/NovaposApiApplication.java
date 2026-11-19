@@ -1,13 +1,13 @@
-package com.novapos;
+package com.RoxPos;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class NovaposApiApplication {
+public class RoxPosApiApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(NovaposApiApplication.class, args);
+		SpringApplication.run(RoxPosApiApplication.class, args);
 	}
 
 }

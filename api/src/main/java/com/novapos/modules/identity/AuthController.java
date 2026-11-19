@@ -1,9 +1,9 @@
-package com.novapos.modules.identity;
+package com.RoxPos.modules.identity;
 
-import com.novapos.common.security.SessionPrincipal;
-import com.novapos.modules.identity.dto.AuthSessionResponse;
-import com.novapos.modules.identity.dto.LoginRequest;
-import com.novapos.modules.identity.dto.RefreshRequest;
+import com.RoxPos.common.security.SessionPrincipal;
+import com.RoxPos.modules.identity.dto.AuthSessionResponse;
+import com.RoxPos.modules.identity.dto.LoginRequest;
+import com.RoxPos.modules.identity.dto.RefreshRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

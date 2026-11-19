@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Subscription } from 'rxjs';
+import { LanguageService } from '../../core/i18n/language.service';
 import { Category, DeliveryDriver, FloorTable, OrderChannel, Product } from '../../core/models/app.models';
 import { PosService } from '../../core/services/pos.service';
 import { ReceiptService } from '../../core/services/receipt.service';
@@ -17,6 +18,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   private readonly receiptService = inject(ReceiptService);
   private readonly syncService = inject(SyncService);
 
+  protected readonly lang = inject(LanguageService);
   protected readonly pos = inject(PosService);
   protected readonly products = signal<Product[]>([]);
   protected readonly categories = signal<Category[]>([]);
@@ -144,8 +146,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
         const hasTables = this.floorTables().length > 0;
         this.prepareError.set(
           hasTables
-            ? 'Selectionnez une table pour "Sur place".'
-            : 'Aucune table definie. Ajoutez-en dans Gestion > Tables ou utilisez le canal "A emporter".'
+            ? this.lang.t('pos.prepareErrorTable')
+            : this.lang.t('pos.prepareErrorNoTables')
         );
         return;
       }
@@ -153,8 +155,8 @@ export class PosPageComponent implements OnInit, OnDestroy {
         const hasDrivers = this.deliveryDrivers().length > 0;
         this.prepareError.set(
           hasDrivers
-            ? 'Selectionnez un livreur pour une livraison.'
-            : 'Aucun livreur defini. Ajoutez-en dans Gestion > Livreurs ou utilisez un autre canal.'
+            ? this.lang.t('pos.prepareErrorDriver')
+            : this.lang.t('pos.prepareErrorNoDrivers')
         );
         return;
       }
@@ -183,7 +185,7 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   protected categoryName(categoryId: string): string {
-    return this.categories().find((category) => category.id === categoryId)?.name ?? 'Unassigned';
+    return this.categories().find((category) => category.id === categoryId)?.name ?? this.lang.t('pos.unassigned');
   }
 
   protected productCountForCategory(categoryId: string): number {
@@ -195,6 +197,6 @@ export class PosPageComponent implements OnInit, OnDestroy {
   }
 
   protected statusLabel(status: string): string {
-    return status === 'PAID' ? 'Paye' : 'Prepare';
+    return status === 'PAID' ? this.lang.t('pos.paid') : this.lang.t('pos.prepared');
   }
 }

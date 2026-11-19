@@ -1,4 +1,4 @@
-package com.novapos.modules.sync.dto;
+package com.RoxPos.modules.sync.dto;
 
 import java.util.List;
 

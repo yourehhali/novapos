@@ -1,4 +1,4 @@
-package com.novapos.modules.sync.dto;
+package com.RoxPos.modules.sync.dto;
 
 public record SyncStatusResponse(
     String branchId,

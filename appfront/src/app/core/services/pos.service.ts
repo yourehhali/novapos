@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { NovaPosDbService } from '../../offline/novapos-db.service';
+import { RoxPosDbService } from '../../offline/RoxPos-db.service';
 import {
   CashOpening,
   CompletedOrder,
@@ -8,12 +8,14 @@ import {
   FloorTable,
   OrderChannel,
   PaymentMethod,
+  PocketIncomingOrder,
   PosLine,
   Product,
   QueueEntry,
   SyncEventEnvelope,
 } from '../models/app.models';
 import { SessionService } from './session.service';
+import { LanguageService } from '../i18n/language.service';
 
 function dayKeyFor(date: Date): string {
   const y = date.getFullYear();
@@ -24,9 +26,10 @@ function dayKeyFor(date: Date): string {
 
 @Injectable({ providedIn: 'root' })
 export class PosService {
-  private readonly db = inject(NovaPosDbService);
+  private readonly db = inject(RoxPosDbService);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  protected readonly lang = inject(LanguageService);
 
   readonly cart = signal<PosLine[]>([]);
   readonly paymentMethod = signal<'CASH' | 'CARD'>('CASH');
@@ -152,10 +155,10 @@ export class PosService {
   ): Promise<CashOpening> {
     const effectiveBranchId = branchId ?? this.session.branch()?.branchId;
     if (!effectiveBranchId) {
-      throw new Error('Aucune session active.');
+      throw new Error(this.lang.t('services.noActiveSession'));
     }
     if (!Number.isFinite(amount) || amount < 0) {
-      throw new Error('Le montant du fond de caisse est invalide.');
+      throw new Error(this.lang.t('services.invalidOpeningAmount'));
     }
     const dayKey = dayKeyFor(new Date());
     const now = new Date().toISOString();
@@ -314,6 +317,104 @@ export class PosService {
     this.lastOrder.set(order);
     this.cart.set([]);
 
+    return order;
+  }
+
+  /**
+   * Builds a PREPARED order from an order pushed by a paired pocket device.
+   * Mirrors prepareOrder() but sources its lines/channel from the request
+   * instead of the local cart, so the desktop keeps handling printing/payment.
+   */
+  async createExternalOrder(request: PocketIncomingOrder): Promise<CompletedOrder | null> {
+    const branch = this.session.branch();
+    const user = this.session.user();
+    if (!branch || !user) {
+      return null;
+    }
+
+    const products = await this.db.products.toArray();
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    const lines: PosLine[] = [];
+    for (const entry of request.lines) {
+      const product = productMap.get(entry.productId);
+      if (!product || product.available === false) {
+        continue;
+      }
+      const quantity = Math.max(1, Math.floor(entry.quantity));
+      lines.push({
+        productId: product.id,
+        name: product.name,
+        unitPrice: product.price,
+        quantity,
+        total: product.price * quantity,
+      });
+    }
+
+    if (lines.length === 0) {
+      return null;
+    }
+
+    const total = lines.reduce((sum, line) => sum + line.total, 0);
+    const now = new Date().toISOString();
+    const orderId = crypto.randomUUID();
+    const channel = request.channel;
+    const order: CompletedOrder = {
+      id: orderId,
+      orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
+      branchId: branch.branchId,
+      cashierName: request.deviceLabel?.trim() || user.displayName,
+      total,
+      currency: 'MAD',
+      paymentMethod: 'UNPAID',
+      status: 'PREPARED',
+      channel,
+      tableNumber: channel === 'SUR_PLACE' ? request.tableNumber : undefined,
+      livreurId: channel === 'LIVRAISON' ? request.livreurId : undefined,
+      deliveryAddress: channel === 'LIVRAISON' ? request.deliveryAddress : undefined,
+      customerPhone: request.customerPhone,
+      lineCount: lines.length,
+      lines,
+      createdAt: now,
+      kitchenPrintedAt: now,
+      lastUpdatedAt: now,
+      version: 2,
+    };
+
+    const orderCreated = this.createOrderEvent(
+      order,
+      'OrderCreated',
+      1,
+      {
+        orderId,
+        orderNumber: order.orderNumber,
+        lines,
+        total,
+        cashierId: user.id,
+        status: 'PREPARED',
+        source: 'POCKET',
+      },
+      Date.now(),
+    );
+
+    const kitchenTicketPrinted = this.createOrderEvent(
+      order,
+      'KitchenTicketPrinted',
+      2,
+      {
+        orderId,
+        orderNumber: order.orderNumber,
+        printerTarget: 'KITCHEN',
+        printedAt: now,
+      },
+      Date.now() + 1,
+    );
+
+    await this.db.transaction('rw', this.db.completedOrders, this.db.eventQueue, async () => {
+      await this.db.completedOrders.put(order);
+      await this.db.eventQueue.bulkPut([orderCreated, kitchenTicketPrinted]);
+    });
+
+    this.lastOrder.set(order);
     return order;
   }
 

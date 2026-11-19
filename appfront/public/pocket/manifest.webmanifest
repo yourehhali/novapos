@@ -1,0 +1,12 @@
+{
+  "name": "RoxPos Caisse mobile",
+  "short_name": "RoxPos",
+  "description": "Prise de commande sur le reseau local, envoyee a la caisse principale.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0c0e10",
+  "theme_color": "#0c0e10",
+  "icons": []
+}

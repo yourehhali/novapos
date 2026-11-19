@@ -1,0 +1,55 @@
+<article class="panel">
+  <p class="eyebrow">{{ lang.t('settings.pocket.eyebrow') }}</p>
+  <h1>{{ lang.t('settings.pocket.title') }}</h1>
+  <p class="muted">{{ lang.t('settings.pocket.intro') }}</p>
+
+  <div class="setting-card" *ngIf="!isDesktop()">
+    <p>{{ lang.t('settings.pocket.desktopOnly') }}</p>
+  </div>
+
+  <ng-container *ngIf="isDesktop()">
+    <div class="setting-card">
+      <div class="setting-head">
+        <strong>{{ running() ? lang.t('settings.pocket.active') : lang.t('settings.pocket.inactive') }}</strong>
+        <span class="badge" [class.on]="running()">
+          {{ running() ? lang.t('settings.pocket.on') : lang.t('settings.pocket.off') }}
+        </span>
+      </div>
+      <button type="button" class="toggle" [disabled]="busy()" (click)="toggle()">
+        {{ running() ? lang.t('settings.pocket.disable') : lang.t('settings.pocket.enable') }}
+      </button>
+    </div>
+
+    <div class="setting-card" *ngIf="running() && status() as info">
+      <div class="pairing">
+        <img *ngIf="info.qrDataUrl; else qrMissing" [src]="info.qrDataUrl" alt="QR" class="qr" />
+        <ng-template #qrMissing>
+          <div class="qr qr-missing">{{ lang.t('settings.pocket.qrUnavailable') }}</div>
+        </ng-template>
+        <div class="pairing-info">
+          <p class="muted">{{ lang.t('settings.pocket.scanHint') }}</p>
+          <p class="address">{{ info.url }}</p>
+          <p class="pin-label">{{ lang.t('settings.pocket.pin') }}</p>
+          <p class="pin">{{ info.pin }}</p>
+          <button type="button" class="link" [disabled]="busy()" (click)="regenerate()">
+            {{ lang.t('settings.pocket.regeneratePin') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="setting-card" *ngIf="running() && status() as info">
+      <strong>{{ lang.t('settings.pocket.devices') }}</strong>
+      <p class="muted" *ngIf="info.devices.length === 0">{{ lang.t('settings.pocket.noDevices') }}</p>
+      <div class="device" *ngFor="let device of info.devices">
+        <div>
+          <strong>{{ device.label }}</strong>
+          <span class="muted-line">{{ lang.t('settings.pocket.lastSeen', { time: lastSeen(device.lastSeenAt) }) }}</span>
+        </div>
+        <span class="badge">{{ lang.t('settings.pocket.ordersCount', { count: device.orderCount }) }}</span>
+      </div>
+    </div>
+  </ng-container>
+
+  <p class="error" *ngIf="error()">{{ error() }}</p>
+</article>

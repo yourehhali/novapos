@@ -5,6 +5,7 @@ import { CashOpening, DashboardSummary, SyncStatus } from '../../core/models/app
 import { PosService } from '../../core/services/pos.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
+import { LanguageService } from '../../core/i18n/language.service';
 
 const MANAGEMENT_PIN = '281998';
 
@@ -14,80 +15,80 @@ const MANAGEMENT_PIN = '281998';
     <section class="dashboard">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Vue operationnelle succursale</p>
-          <h1>Resume des operations</h1>
+          <p class="eyebrow">{{ lang.t('dashboard.eyebrow') }}</p>
+          <h1>{{ lang.t('dashboard.title') }}</h1>
         </div>
       </header>
 
       <div class="metrics metrics-four">
         <article class="metric-card">
-          <span>Commandes actives</span>
+          <span>{{ lang.t('dashboard.activeOrders') }}</span>
           <strong>{{ summary()?.activeOrders ?? 0 }}</strong>
         </article>
         <article class="metric-card">
-          <span>Chiffre du jour</span>
+          <span>{{ lang.t('dashboard.revenueToday') }}</span>
           <strong>{{ summary()?.revenueToday ?? 0 | number: '1.2-2' }} MAD</strong>
           <small class="metric-sub">
-            Especes: {{ summary()?.revenueCashToday ?? 0 | number: '1.2-2' }}
-            · Carte: {{ summary()?.revenueCardToday ?? 0 | number: '1.2-2' }}
+            {{ lang.t('dashboard.cashLabel') }}: {{ summary()?.revenueCashToday ?? 0 | number: '1.2-2' }}
+            · {{ lang.t('dashboard.cardLabel') }}: {{ summary()?.revenueCardToday ?? 0 | number: '1.2-2' }}
           </small>
         </article>
         <article class="metric-card cash-card">
           <header class="cash-header">
             <div>
-              <span>Fond de caisse</span>
+              <span>{{ lang.t('dashboard.cashDrawer') }}</span>
               <strong>
                 <ng-container *ngIf="cashOpening(); else noCashOpening">
                   {{ cashOpening()!.amount | number: '1.2-2' }} {{ cashOpening()!.currency }}
                 </ng-container>
                 <ng-template #noCashOpening>
-                  Non defini
+                  {{ lang.t('dashboard.notSet') }}
                 </ng-template>
               </strong>
               <small class="metric-sub" *ngIf="cashOpening() as co">
-                Saisi le {{ co.setAt | date: 'dd/MM HH:mm' }}
+                {{ lang.t('dashboard.cashSetAt', { date: (co.setAt | date: 'dd/MM HH:mm') || '' }) }}
               </small>
             </div>
             <button
               type="button"
               class="cash-button"
               (click)="openCashModal()"
-              title="Modifier le fond de caisse"
+              [attr.title]="lang.t('dashboard.editCashDrawer')"
             >
-              {{ cashOpening() ? 'Modifier' : 'Definir' }}
+              {{ cashOpening() ? lang.t('common.edit') : lang.t('dashboard.define') }}
             </button>
           </header>
           <div class="cash-breakdown">
             <div class="cash-line">
-              <span>Encaissements especes</span>
+              <span>{{ lang.t('dashboard.cashCollections') }}</span>
               <strong>{{ summary()?.revenueCashToday ?? 0 | number: '1.2-2' }} MAD</strong>
             </div>
             <div class="cash-line total-expected">
-              <span>Total attendu en caisse</span>
+              <span>{{ lang.t('dashboard.expectedCash') }}</span>
               <strong>{{ expectedCashDrawer() | number: '1.2-2' }} MAD</strong>
             </div>
           </div>
         </article>
         <article class="metric-card accent">
-          <span>Evenements en file</span>
+          <span>{{ lang.t('dashboard.queuedEvents') }}</span>
           <strong>{{ pendingQueueDepth() }}</strong>
         </article>
       </div>
 
       <div class="panel-grid">
         <article class="panel">
-          <h2>Notes operationnelles</h2>
+          <h2>{{ lang.t('dashboard.operationalNotes') }}</h2>
           <ul>
             <li *ngFor="let note of summary()?.operationalNotes || []">{{ note }}</li>
           </ul>
         </article>
 
         <article class="panel">
-          <h2>Etat de synchronisation</h2>
-          <p>Evenements acceptes: {{ syncStatus()?.acceptedEvents ?? 0 }}</p>
-          <p>Doublons detectes: {{ syncStatus()?.duplicateEvents ?? 0 }}</p>
-          <p>Conflits en attente: {{ syncStatus()?.pendingConflicts ?? 0 }}</p>
-          <p>Derniere synchro: {{ summary()?.lastSuccessfulSyncAt || 'En attente' }}</p>
+          <h2>{{ lang.t('dashboard.syncStatus') }}</h2>
+          <p>{{ lang.t('dashboard.acceptedEvents') }}: {{ syncStatus()?.acceptedEvents ?? 0 }}</p>
+          <p>{{ lang.t('dashboard.duplicateEvents') }}: {{ syncStatus()?.duplicateEvents ?? 0 }}</p>
+          <p>{{ lang.t('dashboard.pendingConflicts') }}: {{ syncStatus()?.pendingConflicts ?? 0 }}</p>
+          <p>{{ lang.t('dashboard.lastSync') }}: {{ summary()?.lastSuccessfulSyncAt || lang.t('dashboard.pending') }}</p>
         </article>
       </div>
     </section>
@@ -97,17 +98,17 @@ const MANAGEMENT_PIN = '281998';
       <article class="modal-card" (click)="$event.stopPropagation()">
         <header class="modal-header">
           <div>
-            <p class="eyebrow">{{ cashOpening() ? 'Modifier' : 'Definir' }} le fond de caisse</p>
+            <p class="eyebrow">{{ cashOpening() ? lang.t('dashboard.editCashDrawer') : lang.t('dashboard.defineCashDrawer') }}</p>
             <h2>{{ todayLabel() }}</h2>
           </div>
-          <button type="button" class="modal-close" (click)="closeCashModal()" aria-label="Fermer">&times;</button>
+          <button type="button" class="modal-close" (click)="closeCashModal()" [attr.aria-label]="lang.t('common.close')">&times;</button>
         </header>
 
         <!-- PIN gate -->
         <div class="pin-gate" *ngIf="!cashPinAuthed()">
-          <p class="form-eyebrow">Acces protege</p>
+          <p class="form-eyebrow">{{ lang.t('dashboard.securedAccess') }}</p>
           <label class="pin-field">
-            <span>Code PIN gestion</span>
+            <span>{{ lang.t('dashboard.managementPin') }}</span>
             <input
               type="password"
               inputmode="numeric"
@@ -124,9 +125,9 @@ const MANAGEMENT_PIN = '281998';
             {{ cashPinError() }}
           </div>
           <div class="form-actions">
-            <button type="button" class="secondary-button" (click)="closeCashModal()">Annuler</button>
+            <button type="button" class="secondary-button" (click)="closeCashModal()">{{ lang.t('common.cancel') }}</button>
             <button type="button" class="primary-button" (click)="submitCashPin()">
-              Valider le PIN
+              {{ lang.t('dashboard.validatePin') }}
             </button>
           </div>
         </div>
@@ -136,34 +137,34 @@ const MANAGEMENT_PIN = '281998';
           <div class="form-error" *ngIf="cashSaveError()">{{ cashSaveError() }}</div>
           <div class="form-grid">
             <label>
-              <span>Montant fond de caisse ({{ displayCurrency() }}) *</span>
+              <span>{{ lang.t('dashboard.cashDrawerAmount', { currency: displayCurrency() }) }}</span>
               <input
                 type="number"
                 min="0"
                 step="0.01"
                 [ngModel]="cashAmountInput()"
                 (ngModelChange)="cashAmountInput.set($event)"
-                placeholder="Ex: 500.00"
+                [attr.placeholder]="lang.t('dashboard.amountPlaceholder')"
               />
             </label>
             <label>
-              <span>Note (optionnel)</span>
+              <span>{{ lang.t('dashboard.noteOptional') }}</span>
               <input
                 type="text"
                 [ngModel]="cashNoteInput()"
                 (ngModelChange)="cashNoteInput.set($event)"
-                placeholder="Ex: Fond du matin, 2x200 + 1x100..."
+                [attr.placeholder]="lang.t('dashboard.notePlaceholder')"
               />
             </label>
           </div>
           <div class="cash-preview">
-            <small>Total attendu en caisse apres validation:</small>
+            <small>{{ lang.t('dashboard.expectedCashAfterSave') }}</small>
             <strong>{{ previewExpected() | number: '1.2-2' }} {{ displayCurrency() }}</strong>
           </div>
           <div class="form-actions">
-            <button type="button" class="secondary-button" (click)="closeCashModal()">Annuler</button>
+            <button type="button" class="secondary-button" (click)="closeCashModal()">{{ lang.t('common.cancel') }}</button>
             <button type="button" class="primary-button" [disabled]="cashSaving()" (click)="saveCashOpening()">
-              {{ cashSaving() ? 'Enregistrement...' : 'Enregistrer' }}
+              {{ cashSaving() ? lang.t('dashboard.saving') : lang.t('common.save') }}
             </button>
           </div>
         </div>
@@ -579,6 +580,7 @@ const MANAGEMENT_PIN = '281998';
   standalone: false,
 })
 export class DashboardPageComponent implements OnInit, OnDestroy {
+  protected readonly lang = inject(LanguageService);
   private readonly workspaceService = inject(WorkspaceService);
   private readonly posService = inject(PosService);
   private readonly businessSettingsService = inject(BusinessSettingsService);
@@ -678,7 +680,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       this.cashPinError.set(null);
       this.cashPinInputValue.set('');
     } else {
-      this.cashPinError.set('PIN incorrect. Reessayez.');
+      this.cashPinError.set(this.lang.t('dashboard.pinIncorrect'));
     }
   }
 
@@ -686,7 +688,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     const raw = this.cashAmountInput();
     const amount = typeof raw === 'number' ? raw : Number.parseFloat(raw);
     if (!Number.isFinite(amount) || amount < 0) {
-      this.cashSaveError.set('Montant invalide. Utilisez un nombre positif.');
+      this.cashSaveError.set(this.lang.t('dashboard.invalidAmount'));
       return;
     }
     try {
@@ -701,7 +703,7 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
       this.cashOpening.set(saved);
       this.closeCashModal();
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Enregistrement echoue.';
+      const message = error instanceof Error ? error.message : this.lang.t('dashboard.saveFailed');
       this.cashSaveError.set(message);
     } finally {
       this.cashSaving.set(false);

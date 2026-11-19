@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular
 import { NavigationEnd, Router } from '@angular/router';
 import { Subject, filter, takeUntil } from 'rxjs';
 import { CompletedOrder, DeliveryDriver, FloorTable, OrderChannel, PaymentMethod, SalesSummaryRange } from '../../core/models/app.models';
+import { LanguageService } from '../../core/i18n/language.service';
 import { PosService } from '../../core/services/pos.service';
 import { ReceiptService } from '../../core/services/receipt.service';
 import { SalesSummaryService } from '../../core/services/sales-summary.service';
@@ -25,6 +26,8 @@ export class OrderHistoryPageComponent implements OnInit, OnDestroy {
   private readonly syncService = inject(SyncService);
   private readonly router = inject(Router);
   private readonly workspaceService = inject(WorkspaceService);
+
+  protected readonly lang = inject(LanguageService);
 
   protected readonly PAGE_SIZE = PAGE_SIZE;
   protected readonly allOrders = signal<CompletedOrder[]>([]);
@@ -192,9 +195,11 @@ export class OrderHistoryPageComponent implements OnInit, OnDestroy {
 
   protected channelLabel(order: CompletedOrder): string {
     const ch = order.channel;
-    if (ch === 'EMPORTER') return 'A emporter';
-    if (ch === 'LIVRAISON') return 'Livraison';
-    return order.tableNumber ? `Table ${order.tableNumber}` : 'Sur place';
+    if (ch === 'EMPORTER') return this.lang.t('orders.channelEmporter');
+    if (ch === 'LIVRAISON') return this.lang.t('orders.channelLivraison');
+    return order.tableNumber
+      ? this.lang.t('orders.tableNumber', { number: order.tableNumber })
+      : this.lang.t('orders.channelSurPlace');
   }
 
   protected channelBadgeClass(order: CompletedOrder): 'surplace' | 'emporter' | 'livraison' {
@@ -207,12 +212,12 @@ export class OrderHistoryPageComponent implements OnInit, OnDestroy {
   protected livreurLabel(order: CompletedOrder): string {
     if (!order.livreurId) return '';
     const driver = this.deliveryDrivers().find((d) => d.id === order.livreurId);
-    if (!driver) return 'Livreur inconnu';
-    return `Livreur N°${driver.number} - ${driver.name}`;
+    if (!driver) return this.lang.t('orders.driverUnknown');
+    return this.lang.t('orders.driverLabel', { number: driver.number, name: driver.name });
   }
 
   protected statusLabel(status: string): string {
-    return status === 'PAID' ? 'Paye' : 'Prepare';
+    return status === 'PAID' ? this.lang.t('orders.paid') : this.lang.t('orders.prepared');
   }
 
   protected paymentMethodFor(orderId: string): 'CASH' | 'CARD' {
@@ -271,15 +276,17 @@ export class OrderHistoryPageComponent implements OnInit, OnDestroy {
   protected summaryPrintedLabel(): string {
     const lastPrintedAt = this.lastSummaryPrintedAt();
     if (!lastPrintedAt) {
-      return 'Aucun total precedent imprime';
+      return this.lang.t('orders.noPreviousSummary');
     }
 
-    return `Dernier total imprime a ${new Date(lastPrintedAt).toLocaleString('fr-FR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    })}`;
+    return this.lang.t('orders.lastSummaryPrintedAt', {
+      time: new Date(lastPrintedAt).toLocaleString('fr-FR', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+    });
   }
 
   private async reloadAll(): Promise<void> {

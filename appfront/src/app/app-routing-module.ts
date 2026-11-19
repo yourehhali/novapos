@@ -6,6 +6,7 @@ import { ManagementPageComponent } from './pages/management/management-page.comp
 import { OrderHistoryPageComponent } from './pages/order-history/order-history-page.component';
 import { PosPageComponent } from './pages/pos/pos-page.component';
 import { ServicePageComponent } from './pages/service/service-page.component';
+import { SettingsPageComponent } from './pages/settings/settings-page.component';
 
 const routes: Routes = [
   {
@@ -17,6 +18,7 @@ const routes: Routes = [
       { path: 'service', component: ServicePageComponent },
       { path: 'orders', component: OrderHistoryPageComponent },
       { path: 'management', component: ManagementPageComponent },
+      { path: 'settings', component: SettingsPageComponent },
       { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
     ],
   },

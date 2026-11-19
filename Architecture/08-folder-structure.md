@@ -39,7 +39,7 @@ nova-pos/
 │   ├── pom.xml
 │   └── src/
 │       ├── main/
-│       │   ├── java/com/novapos/
+│       │   ├── java/com/RoxPos/
 │       │   │   ├── bootstrap/
 │       │   │   ├── common/
 │       │   │   │   ├── config/

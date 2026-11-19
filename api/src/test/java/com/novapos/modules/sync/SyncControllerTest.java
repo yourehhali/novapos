@@ -1,4 +1,4 @@
-package com.novapos.modules.sync;
+package com.RoxPos.modules.sync;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -30,7 +30,7 @@ class SyncControllerTest {
                     .contentType(MediaType.APPLICATION_JSON)
                     .content("""
                         {
-                          "login": "cashier@novapos.ma",
+                          "login": "cashier@RoxPos.ma",
                           "password": "Pass123!"
                         }
                         """)

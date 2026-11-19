@@ -1,7 +1,7 @@
-package com.novapos.modules.printing;
+package com.RoxPos.modules.printing;
 
-import com.novapos.modules.printing.dto.PrinterConfigResponse;
-import com.novapos.modules.shared.SampleDataService;
+import com.RoxPos.modules.printing.dto.PrinterConfigResponse;
+import com.RoxPos.modules.shared.SampleDataService;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

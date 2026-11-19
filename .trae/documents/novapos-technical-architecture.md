@@ -1,6 +1,6 @@
 ## 1. Architecture Design
 
-The initial NovaPOS implementation will be built as a full-stack offline-first web application with an Angular PWA frontend, a Spring Boot modular monolith backend, PostgreSQL as the system of record, Redis for transient coordination, and IndexedDB/Dexie for local-first device persistence.
+The initial RoxPos implementation will be built as a full-stack offline-first web application with an Angular PWA frontend, a Spring Boot modular monolith backend, PostgreSQL as the system of record, Redis for transient coordination, and IndexedDB/Dexie for local-first device persistence.
 
 ```mermaid
 flowchart LR

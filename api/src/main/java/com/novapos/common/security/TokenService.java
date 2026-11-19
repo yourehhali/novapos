@@ -1,4 +1,4 @@
-package com.novapos.common.security;
+package com.RoxPos.common.security;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -25,9 +25,9 @@ public class TokenService {
 
     public TokenService(
         ObjectMapper objectMapper,
-        @Value("${novapos.security.jwt-secret}") String secret,
-        @Value("${novapos.security.access-token-minutes}") long accessTokenMinutes,
-        @Value("${novapos.security.refresh-token-minutes}") long refreshTokenMinutes
+        @Value("${RoxPos.security.jwt-secret}") String secret,
+        @Value("${RoxPos.security.access-token-minutes}") long accessTokenMinutes,
+        @Value("${RoxPos.security.refresh-token-minutes}") long refreshTokenMinutes
     ) {
         this.objectMapper = objectMapper;
         this.secret = secret;

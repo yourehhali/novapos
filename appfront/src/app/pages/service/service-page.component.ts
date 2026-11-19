@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Subscription } from 'rxjs';
 import { CompletedOrder, DeliveryDriver, FloorTable } from '../../core/models/app.models';
+import { LanguageService } from '../../core/i18n/language.service';
 import { PosService } from '../../core/services/pos.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
 
@@ -18,6 +19,7 @@ type ServiceTab = 'tables' | 'deliveries';
 export class ServicePageComponent implements OnInit, OnDestroy {
   private readonly posService = inject(PosService);
   private readonly workspaceService = inject(WorkspaceService);
+  protected readonly lang = inject(LanguageService);
 
   protected readonly activeTab = signal<ServiceTab>('tables');
   protected readonly floorTables = signal<FloorTable[]>([]);
@@ -103,9 +105,9 @@ export class ServicePageComponent implements OnInit, OnDestroy {
   }
 
   driverName(livreurId?: string): string {
-    if (!livreurId) return 'Non assigne';
+    if (!livreurId) return this.lang.t('service.unassigned');
     const d = this.deliveryDrivers().find((row) => row.id === livreurId);
-    return d ? `N°${d.number} - ${d.name}` : 'Non assigne';
+    return d ? `N°${d.number} - ${d.name}` : this.lang.t('service.unassigned');
   }
 
   async reopenOrder(orderId: string): Promise<void> {
