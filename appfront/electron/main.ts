@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeImage, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import { writeFile, unlink } from 'node:fs/promises';
 import net from 'node:net';
@@ -260,13 +260,34 @@ function getAppIcon(): Electron.NativeImage | null {
 
 let mainWindow: BrowserWindow | null = null;
 
+/**
+ * POS terminals often run on small panels (e.g. 1024x768). Below the desktop
+ * sizes the whole renderer is scaled down so every screen keeps the exact same
+ * desktop layout instead of falling back to the stacked, narrow shell.
+ */
+function resolveDisplayScale(): number {
+  try {
+    const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+    if (width > 1200 && height >= 850) {
+      return 1;
+    }
+
+    const scale = Math.min(width / 1280, height / 960);
+    return Math.min(1, Math.max(0.75, scale));
+  } catch {
+    return 1;
+  }
+}
+
 function createMainWindow(): BrowserWindow {
   const appIcon = getAppIcon();
+  const isDevelopment = Boolean(process.env['RoxPos_RENDERER_URL']);
   const window = new BrowserWindow({
     width: 1520,
     height: 960,
-    minWidth: 1180,
-    minHeight: 760,
+    minWidth: 1000,
+    minHeight: 720,
+    fullscreen: !isDevelopment,
     backgroundColor: '#0b0f12',
     autoHideMenuBar: true,
     icon: appIcon ?? undefined,
@@ -276,6 +297,10 @@ function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: false,
     },
+  });
+
+  window.webContents.on('did-finish-load', () => {
+    window.webContents.setZoomFactor(resolveDisplayScale());
   });
 
   const rendererUrl = process.env['RoxPos_RENDERER_URL'];
@@ -421,6 +446,9 @@ function registerDesktopApi(): void {
   ipcMain.handle('RoxPos:print-sales-summary', async (_event, request: PrintSalesSummaryRequest) =>
     printSalesSummary(request),
   );
+  ipcMain.handle('RoxPos:quit-app', () => {
+    app.quit();
+  });
 }
 
 async function printTicket(request: PrintTicketRequest): Promise<{

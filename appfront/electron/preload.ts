@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('RoxPosDesktop', {
   getPocketStatus: () => ipcRenderer.invoke('RoxPos:pocket-status'),
   regeneratePocketPin: () => ipcRenderer.invoke('RoxPos:pocket-regenerate-pin'),
   pushPocketData: (payload: unknown) => ipcRenderer.invoke('RoxPos:pocket-push-data', payload),
+  quitApp: () => ipcRenderer.invoke('RoxPos:quit-app'),
   resolvePocketOrder: (requestId: string, result: unknown) =>
     ipcRenderer.invoke('RoxPos:pocket-resolve-order', requestId, result),
   onPocketOrder: (listener: (order: unknown) => void) => {

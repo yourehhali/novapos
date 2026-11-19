@@ -22,6 +22,7 @@ declare global {
       getPocketStatus(): Promise<PocketServerStatus>;
       regeneratePocketPin(): Promise<PocketServerStatus>;
       pushPocketData(payload: PocketCatalogPayload): Promise<{ ok: boolean }>;
+      quitApp(): Promise<void>;
       resolvePocketOrder(requestId: string, result: PocketOrderResult): Promise<{ ok: boolean }>;
       onPocketOrder(listener: (order: PocketIncomingOrder) => void): () => void;
       onPocketStatus(listener: (status: PocketServerStatus) => void): () => void;

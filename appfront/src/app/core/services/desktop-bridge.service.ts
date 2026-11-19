@@ -106,6 +106,15 @@ export class DesktopBridgeService {
     await bridge.pushPocketData(payload);
   }
 
+  async quitApp(): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.quitApp();
+  }
+
   async resolvePocketOrder(requestId: string, result: PocketOrderResult): Promise<void> {
     const bridge = window.RoxPosDesktop;
     if (!bridge) {

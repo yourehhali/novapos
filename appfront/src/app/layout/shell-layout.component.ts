@@ -5,6 +5,7 @@ import { SessionService } from '../core/services/session.service';
 import { SyncService } from '../core/services/sync.service';
 import { BusinessSettingsService } from '../core/services/business-settings.service';
 import { WorkspaceService } from '../core/services/workspace.service';
+import { DesktopBridgeService } from '../core/services/desktop-bridge.service';
 import { LanguageService } from '../core/i18n/language.service';
 
 @Component({
@@ -122,6 +123,21 @@ import { LanguageService } from '../core/i18n/language.service';
 
           <div class="status-cluster">
             <span class="pill neutral">{{ lang.t('shell.localMode') }}</span>
+            <button
+              *ngIf="isDesktop()"
+              type="button"
+              class="exit-button"
+              (click)="exitApp()"
+              [attr.title]="lang.t('shell.exit')"
+              [attr.aria-label]="lang.t('shell.exit')"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
+              <span>{{ lang.t('shell.exit') }}</span>
+            </button>
           </div>
         </header>
 
@@ -152,18 +168,18 @@ import { LanguageService } from '../core/i18n/language.service';
         align-self: flex-start;
         display: flex;
         flex-direction: column;
-        width: 248px;
+        width: 200px;
         height: 100svh;
         overflow-y: auto;
-        padding: 18px 14px;
+        padding: 14px 12px;
         border-right: 1px solid var(--surface-border);
         background: var(--surface);
         transition: width 0.18s ease, padding 0.18s ease;
       }
 
       .sidebar.collapsed {
-        width: 88px;
-        padding: 18px 10px;
+        width: 68px;
+        padding: 14px 8px;
       }
 
       .sidebar-toggle {
@@ -172,23 +188,23 @@ import { LanguageService } from '../core/i18n/language.service';
         justify-content: center;
         gap: 8px;
         width: 100%;
-        margin-bottom: 14px;
-        padding: 8px 10px;
+        margin-bottom: 12px;
+        padding: 7px 9px;
         border: 1px solid var(--surface-border);
         border-radius: var(--radius-sm);
         background: var(--surface-soft);
         color: var(--muted-strong);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
       }
 
       .brand {
         display: flex;
-        gap: 12px;
+        gap: 10px;
         align-items: center;
-        margin-bottom: 22px;
-        min-height: 42px;
+        margin-bottom: 18px;
+        min-height: 34px;
       }
 
       .sidebar.collapsed .brand {
@@ -197,7 +213,7 @@ import { LanguageService } from '../core/i18n/language.service';
 
       .brand h1 {
         margin: 0;
-        font-size: 18px;
+        font-size: 16px;
         font-weight: 600;
       }
 
@@ -205,7 +221,7 @@ import { LanguageService } from '../core/i18n/language.service';
       .eyebrow {
         margin: 0;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
       }
@@ -213,38 +229,38 @@ import { LanguageService } from '../core/i18n/language.service';
       .brand-mark {
         display: grid;
         place-items: center;
-        width: 40px;
-        height: 40px;
+        width: 34px;
+        height: 34px;
         border-radius: var(--radius-sm);
         background: var(--accent);
         color: var(--surface);
         box-shadow: var(--shadow-soft);
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 700;
       }
 
       .nav {
         display: grid;
-        gap: 6px;
+        gap: 4px;
       }
 
       .nav a {
         display: inline-flex;
         align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
+        gap: 9px;
+        padding: 8px 10px;
         border-radius: var(--radius-sm);
         color: var(--muted-strong);
         background: transparent;
         border: 1px solid transparent;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: 500;
       }
 
       .nav-icon {
         flex: 0 0 auto;
-        width: 18px;
-        height: 18px;
+        width: 16px;
+        height: 16px;
         display: block;
       }
 
@@ -255,13 +271,13 @@ import { LanguageService } from '../core/i18n/language.service';
 
       .sidebar.collapsed .nav a {
         justify-content: center;
-        padding: 10px;
-        font-size: 12px;
+        padding: 8px;
+        font-size: 11px;
       }
 
       .sidebar.collapsed .nav-icon {
-        width: 20px;
-        height: 20px;
+        width: 18px;
+        height: 18px;
       }
 
       .nav a:hover {
@@ -277,37 +293,37 @@ import { LanguageService } from '../core/i18n/language.service';
 
       .sidebar-divider {
         height: 1px;
-        margin: 16px 6px;
+        margin: 12px 6px;
         background: var(--surface-border);
         opacity: 0.85;
       }
 
       .sidebar.collapsed .sidebar-divider {
-        margin: 16px 2px;
+        margin: 12px 2px;
       }
 
       .nav-secondary a {
-        font-size: 13px;
+        font-size: 12px;
       }
 
       .language-switch {
         margin-top: auto;
-        padding-top: 14px;
+        padding-top: 12px;
         border-top: 1px solid var(--surface-border);
       }
 
       .language-label {
         display: block;
-        margin-bottom: 8px;
+        margin-bottom: 6px;
         color: var(--muted);
-        font-size: 11px;
+        font-size: 10px;
         text-transform: uppercase;
         letter-spacing: 0.12em;
       }
 
       .language-options {
         display: flex;
-        gap: 8px;
+        gap: 6px;
       }
 
       .language-option {
@@ -315,13 +331,13 @@ import { LanguageService } from '../core/i18n/language.service';
         flex: 1;
         align-items: center;
         justify-content: center;
-        gap: 6px;
-        padding: 8px 10px;
+        gap: 5px;
+        padding: 6px 8px;
         border: 1px solid var(--surface-border);
         border-radius: var(--radius-sm);
         background: var(--surface-soft);
         color: var(--muted-strong);
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         cursor: pointer;
       }
@@ -337,7 +353,7 @@ import { LanguageService } from '../core/i18n/language.service';
       }
 
       .language-flag {
-        font-size: 16px;
+        font-size: 14px;
         line-height: 1;
       }
 
@@ -346,13 +362,13 @@ import { LanguageService } from '../core/i18n/language.service';
       }
 
       .sidebar.collapsed .language-option {
-        padding: 8px;
+        padding: 6px;
       }
 
       .workspace {
         flex: 1;
         min-width: 0;
-        padding: 18px 20px 20px;
+        padding: 14px 16px 16px;
       }
 
       .topbar {
@@ -360,12 +376,12 @@ import { LanguageService } from '../core/i18n/language.service';
         justify-content: space-between;
         gap: 12px;
         align-items: center;
-        margin-bottom: 18px;
+        margin-bottom: 14px;
       }
 
       .topbar h2 {
         margin: 4px 0 0;
-        font-size: 24px;
+        font-size: 20px;
         font-weight: 600;
       }
 
@@ -383,12 +399,12 @@ import { LanguageService } from '../core/i18n/language.service';
       .pill {
         display: inline-flex;
         align-items: center;
-        padding: 6px 10px;
+        padding: 5px 9px;
         border-radius: 999px;
         border: 1px solid var(--surface-border);
         background: var(--surface);
         color: var(--muted-strong);
-        font-size: 12px;
+        font-size: 11px;
       }
 
       .pill.online {
@@ -407,13 +423,37 @@ import { LanguageService } from '../core/i18n/language.service';
         color: var(--muted-strong);
       }
 
+      .exit-button {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(238, 107, 107, 0.32);
+        background: rgba(238, 107, 107, 0.10);
+        color: var(--danger);
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .exit-button svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .exit-button:hover {
+        border-color: rgba(238, 107, 107, 0.55);
+        background: rgba(238, 107, 107, 0.18);
+      }
+
       .content {
         min-height: calc(100svh - 90px);
         display: flex;
         flex-direction: column;
       }
 
-      @media (max-width: 1100px) {
+      @media (max-width: 900px) {
         .shell {
           flex-direction: column;
         }
@@ -452,8 +492,10 @@ export class ShellLayoutComponent implements OnInit, OnDestroy {
   protected readonly sync = inject(SyncService);
   protected readonly businessSettingsService = inject(BusinessSettingsService);
   protected readonly workspaceService = inject(WorkspaceService);
+  protected readonly desktopBridge = inject(DesktopBridgeService);
   protected readonly lang = inject(LanguageService);
   protected readonly sidebarCollapsed = signal(this.readSidebarPreference());
+  protected readonly isDesktop = signal(this.desktopBridge.isDesktop());
   protected readonly storedBusinessName = signal<string | null>(null);
   protected readonly businessName = computed(() => this.storedBusinessName() ?? this.session.user()?.businessName ?? 'Almani Nafris');
   private readonly destroy$ = new Subject<void>();
@@ -503,6 +545,10 @@ export class ShellLayoutComponent implements OnInit, OnDestroy {
     if (typeof window !== 'undefined') {
       window.localStorage.setItem('RoxPos.sidebar.collapsed', next ? 'true' : 'false');
     }
+  }
+
+  protected async exitApp(): Promise<void> {
+    await this.desktopBridge.quitApp();
   }
 
   private readSidebarPreference(): boolean {
