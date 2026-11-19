@@ -435,6 +435,7 @@ const MANAGEMENT_PIN = '281998';
       .pin-field input {
         padding: 10px 12px;
         border-radius: var(--radius-sm);
+        width: 100%;
         background: var(--bg);
         border: 1px solid var(--surface-border);
         color: var(--text);
