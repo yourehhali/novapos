@@ -14,7 +14,6 @@ import { DesktopBridgeService } from './desktop-bridge.service';
 import { LanguageService } from '../i18n/language.service';
 
 type TicketKind = PrintTicketRequest['kind'];
-const DESKTOP_ESCPOS_TIMEOUT_MS = 5000;
 
 @Injectable({ providedIn: 'root' })
 export class ReceiptService {
@@ -51,7 +50,7 @@ export class ReceiptService {
     }
 
     try {
-      const desktopPromise = this.desktopBridge.printSalesSummary({
+      const result = await this.desktopBridge.printSalesSummary({
         printer,
         report,
         paperWidthMm: printer?.paperWidthMm ?? settings.receiptPaperWidthMm,
@@ -59,8 +58,6 @@ export class ReceiptService {
         silent: printer?.silent ?? true,
         settings,
       } as PrintSalesSummaryRequest);
-      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
-      const result = await Promise.race([desktopPromise, timeout]);
       if (result?.success) return true;
       this.showPrintError(
         this.lang.t('services.salesSummaryPrintFailedTitle'),
@@ -94,7 +91,7 @@ export class ReceiptService {
     }
 
     try {
-      const desktopPromise = this.desktopBridge.printTicket({
+      const result = await this.desktopBridge.printTicket({
         kind,
         printer,
         order,
@@ -103,8 +100,6 @@ export class ReceiptService {
         silent: printer?.silent ?? true,
         settings,
       } as PrintTicketRequest);
-      const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), DESKTOP_ESCPOS_TIMEOUT_MS));
-      const result = await Promise.race([desktopPromise, timeout]);
       if (result?.success) return true;
       const ticketLabel = kind === 'KITCHEN' ? this.lang.t('services.kitchenTicketLabel') : this.lang.t('services.paymentTicketLabel');
       this.showPrintError(

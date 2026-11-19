@@ -587,7 +587,11 @@ async function sendToNetworkPrinter(
         port: destination.port,
       },
       () => {
-        socket.end(payload);
+        // Resolve as soon as the payload is flushed to the printer instead of
+        // waiting for the printer to close the TCP connection: many thermal
+        // printers keep the socket open, which made finished prints look like
+        // they were still in progress until the inactivity timeout fired.
+        socket.end(payload, () => resolve());
       },
     );
 
@@ -596,11 +600,6 @@ async function sendToNetworkPrinter(
       socket.destroy(new Error(`Timed out while connecting to ${destination.host}:${destination.port}.`));
     });
     socket.on('error', (error) => reject(error));
-    socket.on('close', (hadError) => {
-      if (!hadError) {
-        resolve();
-      }
-    });
   });
 }
 
