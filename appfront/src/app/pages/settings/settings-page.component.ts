@@ -96,14 +96,15 @@ import { WorkspaceService } from '../../core/services/workspace.service';
       }
 
       .panel {
-        padding: 22px;
-        border-radius: var(--radius-lg);
+        padding: 0;
+        border-radius: 0;
         border: 1px solid var(--surface-border);
         background: var(--surface);
-        box-shadow: var(--shadow-soft);
       }
 
       .eyebrow {
+        margin: 0;
+        padding: 18px 22px 0;
         color: var(--muted);
         font-size: 11px;
         text-transform: uppercase;
@@ -111,16 +112,17 @@ import { WorkspaceService } from '../../core/services/workspace.service';
       }
 
       h1 {
-        margin-top: 6px;
+        margin: 6px 0 0;
+        padding: 0 22px 16px;
         font-size: 26px;
       }
 
       .setting-card {
-        margin-top: 16px;
-        padding: 18px;
-        border-radius: 14px;
-        background: var(--surface-raised);
-        border: 1px solid var(--surface-border);
+        margin-top: 0;
+        padding: 16px 22px;
+        border-radius: 0;
+        border-top: 1px solid var(--surface-border);
+        background: transparent;
       }
 
       .setting-head {
@@ -143,18 +145,21 @@ import { WorkspaceService } from '../../core/services/workspace.service';
       .badge {
         display: inline-flex;
         align-items: center;
-        padding: 6px 10px;
-        border-radius: 999px;
-        background: var(--accent-soft);
-        color: var(--accent);
+        padding: 4px 10px;
+        border-radius: 0;
+        border: 1px solid var(--surface-border);
+        background: var(--surface-raised);
+        color: var(--muted);
         font-size: 11px;
         font-weight: 600;
       }
 
       button {
-        margin-top: 16px;
-        border: 0;
-        border-radius: 12px;
+        margin: 0;
+        width: 100%;
+        border: 1px solid var(--surface-border);
+        border-top: 0;
+        border-radius: 0;
         padding: 14px 16px;
         background: var(--accent);
         color: #041118;

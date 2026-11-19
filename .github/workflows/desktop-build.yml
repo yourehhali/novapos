@@ -32,14 +32,27 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
-      - name: Package Windows desktop app
-        run: npm run desktop:package:win
+      - name: Build renderer and main process
+        run: npm run desktop:build
 
-      - name: Upload Windows artifacts
+      - name: Package Windows 32-bit (ia32)
+        run: npx electron-builder --publish never --win nsis portable --ia32 -c.directories.output=release/win-ia32
+
+      - name: Package Windows 64-bit (x64)
+        run: npx electron-builder --publish never --win nsis portable --x64 -c.directories.output=release/win-x64
+
+      - name: Upload Windows 32-bit artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: RoxPos-desktop-windows
-          path: appfront/release/**
+          name: RoxPos-desktop-windows-ia32
+          path: appfront/release/win-ia32/*.exe
+          if-no-files-found: error
+
+      - name: Upload Windows 64-bit artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: RoxPos-desktop-windows-x64
+          path: appfront/release/win-x64/*.exe
           if-no-files-found: error
 
   build-macos:
