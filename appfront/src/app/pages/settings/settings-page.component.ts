@@ -85,6 +85,8 @@ import { WorkspaceService } from '../../core/services/workspace.service';
       </article>
 
       <app-pocket-panel></app-pocket-panel>
+
+      <app-pos-ws-panel></app-pos-ws-panel>
     </section>
   `,
   styles: [

@@ -3,9 +3,22 @@ import {
   DesktopPrinterInfo,
   DesktopRuntimeInfo,
   PocketCatalogPayload,
+  PocketHistoryPayload,
+  PocketHistoryRequest,
   PocketIncomingOrder,
   PocketOrderResult,
+  PocketPayRequest,
+  PocketPayResult,
   PocketServerStatus,
+  PosWsCatalogPayload,
+  PosWsClientStatus,
+  PosWsConfigPatch,
+  PosWsConfigView,
+  PosWsIncomingOrder,
+  PosWsLogEntry,
+  PosWsOrderResultPayload,
+  PosWsSnapshot,
+  PosWsSnapshotRequest,
   PrintSalesSummaryRequest,
   PrintTicketRequest,
   PrintTicketResult,
@@ -124,6 +137,24 @@ export class DesktopBridgeService {
     await bridge.resolvePocketOrder(requestId, result);
   }
 
+  async resolvePocketPay(requestId: string, result: PocketPayResult): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.resolvePocketPay(requestId, result);
+  }
+
+  async resolvePocketHistory(requestId: string, payload: PocketHistoryPayload): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.resolvePocketHistory(requestId, payload);
+  }
+
   onPocketOrder(listener: (order: PocketIncomingOrder) => void): () => void {
     const bridge = window.RoxPosDesktop;
     if (!bridge) {
@@ -133,6 +164,24 @@ export class DesktopBridgeService {
     return bridge.onPocketOrder(listener);
   }
 
+  onPocketPay(listener: (request: PocketPayRequest) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onPocketPay(listener);
+  }
+
+  onPocketHistory(listener: (request: PocketHistoryRequest) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onPocketHistory(listener);
+  }
+
   onPocketStatus(listener: (status: PocketServerStatus) => void): () => void {
     const bridge = window.RoxPosDesktop;
     if (!bridge) {
@@ -140,5 +189,122 @@ export class DesktopBridgeService {
     }
 
     return bridge.onPocketStatus(listener);
+  }
+
+  async getWsStatus(): Promise<PosWsClientStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.getWsStatus();
+  }
+
+  async getWsConfig(): Promise<PosWsConfigView | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.getWsConfig();
+  }
+
+  async setWsConfig(patch: PosWsConfigPatch): Promise<PosWsClientStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.setWsConfig(patch);
+  }
+
+  async connectWs(): Promise<PosWsClientStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.connectWs();
+  }
+
+  async disconnectWs(): Promise<PosWsClientStatus | null> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return null;
+    }
+
+    return bridge.disconnectWs();
+  }
+
+  async pushWsCatalog(catalog: PosWsCatalogPayload): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.pushWsCatalog(catalog);
+  }
+
+  async getWsLogs(): Promise<PosWsLogEntry[]> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return [];
+    }
+
+    return bridge.getWsLogs();
+  }
+
+  async resolveWsOrder(eventId: string, result: PosWsOrderResultPayload): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.resolveWsOrder(eventId, result);
+  }
+
+  async resolveWsSnapshot(requestId: string, snapshot: PosWsSnapshot): Promise<void> {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return;
+    }
+
+    await bridge.resolveWsSnapshot(requestId, snapshot);
+  }
+
+  onWsStatus(listener: (status: PosWsClientStatus) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onWsStatus(listener);
+  }
+
+  onWsLog(listener: (entry: PosWsLogEntry) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onWsLog(listener);
+  }
+
+  onWsOrder(listener: (request: PosWsIncomingOrder) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onWsOrder(listener);
+  }
+
+  onWsSnapshotRequest(listener: (request: PosWsSnapshotRequest) => void): () => void {
+    const bridge = window.RoxPosDesktop;
+    if (!bridge) {
+      return () => undefined;
+    }
+
+    return bridge.onWsSnapshotRequest(listener);
   }
 }

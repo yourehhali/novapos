@@ -1,0 +1,103 @@
+<div
+  class="virtual-keyboard"
+  *ngIf="keyboard.visible()"
+  role="group"
+  data-virtual-keyboard-root
+  data-drag-pan-ignore
+  [attr.aria-label]="lang.t('common.keyboard')"
+>
+  <div class="vk-pad vk-numeric" *ngIf="keyboard.inputKind() !== 'text'; else textPad">
+    <div class="vk-row" *ngFor="let row of keyboard.numericRows()">
+      <button
+        *ngFor="let item of row"
+        type="button"
+        class="vk-key"
+        [class.is-ghost]="item.tone === 'ghost'"
+        [class.is-accent]="item.tone === 'accent'"
+        [style.flex-grow]="item.grow ?? 1"
+        [attr.aria-label]="item.label"
+        (mousedown)="retainFocus($event)"
+        (click)="keyboard.press(item)"
+      >
+        {{ item.label }}
+      </button>
+    </div>
+  </div>
+
+  <ng-template #textPad>
+    <div class="vk-pad vk-text">
+      <div class="vk-row">
+        <button
+          *ngFor="let digit of digits"
+          type="button"
+          class="vk-key vk-key-char"
+          (mousedown)="retainFocus($event)"
+          (click)="type(digit)"
+        >
+          {{ digit }}
+        </button>
+      </div>
+
+      <div class="vk-row" *ngFor="let row of keyboard.textRows(); let last = last">
+        <button
+          *ngIf="last"
+          type="button"
+          class="vk-key vk-key-mod"
+          [class.is-active]="keyboard.capsLock()"
+          [attr.aria-label]="lang.t('common.shift')"
+          (mousedown)="retainFocus($event)"
+          (click)="keyboard.press(shiftKey)"
+        >
+          ⇧
+        </button>
+        <button
+          *ngFor="let letter of row"
+          type="button"
+          class="vk-key vk-key-char"
+          (mousedown)="retainFocus($event)"
+          (click)="type(letter)"
+        >
+          {{ keyboard.capsLock() ? letter.toUpperCase() : letter }}
+        </button>
+        <button
+          *ngIf="last"
+          type="button"
+          class="vk-key vk-key-mod"
+          aria-label="Backspace"
+          (mousedown)="retainFocus($event)"
+          (click)="keyboard.press(backspaceKey)"
+        >
+          ⌫
+        </button>
+      </div>
+
+      <div class="vk-row">
+        <button
+          *ngFor="let symbol of symbols"
+          type="button"
+          class="vk-key vk-key-char"
+          (mousedown)="retainFocus($event)"
+          (click)="type(symbol)"
+        >
+          {{ symbol }}
+        </button>
+        <button
+          type="button"
+          class="vk-key vk-key-space"
+          (mousedown)="retainFocus($event)"
+          (click)="keyboard.press(spaceKey)"
+        >
+          {{ lang.t('common.space') }}
+        </button>
+        <button
+          type="button"
+          class="vk-key vk-key-done"
+          (mousedown)="retainFocus($event)"
+          (click)="keyboard.press(doneKey)"
+        >
+          {{ lang.t('common.done') }}
+        </button>
+      </div>
+    </div>
+  </ng-template>
+</div>

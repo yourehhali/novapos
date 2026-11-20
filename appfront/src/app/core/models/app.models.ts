@@ -177,6 +177,19 @@ export interface CompletedOrder {
   paidAt?: string;
   lastUpdatedAt: string;
   version: number;
+  /** Identifier of the pocket device that pushed the order (used for per-device stats). */
+  deviceId?: string;
+  /** Human label of the pocket device that pushed the order. */
+  deviceLabel?: string;
+}
+
+/**
+ * Durable, per-key sequence used to build human ticket numbers
+ * (T01-001 per table, W00001 delivery, E00001 takeaway).
+ */
+export interface TicketCounter {
+  key: string;
+  value: number;
 }
 
 export interface PosLine {
@@ -223,6 +236,8 @@ export interface TicketLayoutConfig {
   logoType: LogoType;
   logoText: string;
   logoImageDataUrl: string;
+  /** Logo width as a percentage of the printable ticket width (0-100). 0 hides the logo; 100 spans the full width. Aspect ratio is always preserved. */
+  logoScale: number;
   heading: string;
   subheading: string;
   footerLine1: string;
@@ -337,6 +352,7 @@ export interface PocketIncomingOrder {
   deliveryAddress?: string;
   note?: string;
   lines: PocketOrderLinePayload[];
+  deviceId?: string;
   deviceLabel?: string;
 }
 
@@ -348,6 +364,60 @@ export interface PocketOrderResult {
   error?: string;
 }
 
+/** Snapshot of one order returned to a pocket device for its own history/stats. */
+export interface PocketOrderSummary {
+  orderId: string;
+  orderNumber: string;
+  channel: OrderChannel;
+  status: OrderStatus;
+  paymentMethod: PaymentMethod;
+  total: number;
+  currency: string;
+  tableNumber?: string;
+  lineCount: number;
+  createdAt: string;
+  paidAt?: string;
+}
+
+/** Request from a pocket device asking the desktop to settle and print an order. */
+export interface PocketPayRequest {
+  requestId: string;
+  orderId: string;
+  paymentMethod: PaymentMethod;
+  deviceId?: string;
+  deviceLabel?: string;
+}
+
+export interface PocketPayResult {
+  ok: boolean;
+  orderId?: string;
+  orderNumber?: string;
+  total?: number;
+  printed?: boolean;
+  error?: string;
+}
+
+/** Per-device aggregates computed on the desktop and shown in the pocket app. */
+export interface PocketStats {
+  orderCount: number;
+  paidCount: number;
+  unpaidCount: number;
+  totalCollected: number;
+  currency: string;
+}
+
+export interface PocketHistoryPayload {
+  orders: PocketOrderSummary[];
+  stats: PocketStats;
+}
+
+/** Request from a pocket device asking the desktop for its own order history/stats. */
+export interface PocketHistoryRequest {
+  requestId: string;
+  deviceId?: string;
+  deviceLabel?: string;
+}
+
 export interface PocketCatalogPayload {
   businessName: string;
   currency: string;
@@ -355,4 +425,188 @@ export interface PocketCatalogPayload {
   products: Product[];
   tables: FloorTable[];
   drivers: DeliveryDriver[];
+}
+
+/* ------------------------------------------------------------------------- *
+ * almani-nafris.com WebSocket integration (see pos-websocket-protocol.md).
+ * The transport lives in the Electron main process; these types describe the
+ * shared protocol envelopes plus the IPC/UI surface used by the renderer.
+ * ------------------------------------------------------------------------- */
+
+export type PosWsConnectionState =
+  | 'DISCONNECTED'
+  | 'CONNECTING'
+  | 'CONNECTED'
+  | 'SYNCHRONIZING'
+  | 'AUTH_ERROR';
+
+export type PosWsMessageType =
+  | 'auth'
+  | 'auth.success'
+  | 'auth.error'
+  | 'products.sync'
+  | 'products.updated'
+  | 'products.ack'
+  | 'order.created'
+  | 'order.ack'
+  | 'order.error'
+  | 'orders.sync'
+  | 'ping'
+  | 'pong'
+  | 'connection.status';
+
+export interface PosWsEnvelope<T = unknown> {
+  type: PosWsMessageType;
+  eventId: string;
+  timestamp: string;
+  payload: T;
+}
+
+export interface PosWsCategoryPayload {
+  id: string;
+  name: string;
+}
+
+export interface PosWsProductPayload {
+  id: string;
+  name: string;
+  categoryId: string;
+  price: number;
+  currency: string;
+  sku: string;
+  available: boolean;
+}
+
+export interface PosWsCatalogPayload {
+  branchId: string;
+  version: number;
+  hash: string;
+  currency: string;
+  categories: PosWsCategoryPayload[];
+  products: PosWsProductPayload[];
+}
+
+export type PosWsOrderErrorCode =
+  | 'invalid_payload'
+  | 'empty_order'
+  | 'unknown_product'
+  | 'product_unavailable'
+  | 'session_unavailable'
+  | 'pos_unavailable'
+  | 'processing_timeout'
+  | 'internal_error';
+
+export interface PosWsOrderCreatedPayload {
+  channel: OrderChannel;
+  tableNumber?: string;
+  customerPhone?: string;
+  deliveryAddress?: string;
+  note?: string;
+  lines: PocketOrderLinePayload[];
+}
+
+export interface PosWsOrderAckPayload {
+  ok: true;
+  orderId: string;
+  orderNumber: string;
+  total: number;
+}
+
+export interface PosWsOrderErrorPayload {
+  ok: false;
+  code: PosWsOrderErrorCode;
+  message: string;
+  productIds?: string[];
+}
+
+export type PosWsOrderResultPayload = PosWsOrderAckPayload | PosWsOrderErrorPayload;
+
+export interface PosWsOrdersSyncEntry {
+  eventId: string;
+  orderId: string;
+  orderNumber: string;
+  total: number;
+  channel: OrderChannel;
+  createdAt: string;
+}
+
+export interface PosWsOrdersSyncPayload {
+  branchId: string | null;
+  orders: PosWsOrdersSyncEntry[];
+}
+
+export interface PosWsSnapshot {
+  catalog: PosWsCatalogPayload | null;
+  orders: PosWsOrdersSyncEntry[];
+}
+
+export interface PosWsClientStatus {
+  enabled: boolean;
+  state: PosWsConnectionState;
+  url: string;
+  connectedAt: string | null;
+  lastMessageAt: string | null;
+  lastError: string | null;
+  reconnectAttempt: number;
+  catalogVersion: number | null;
+  catalogHash: string | null;
+  ackedCatalogVersion: number | null;
+  pendingOrders: number;
+}
+
+export interface PosWsConfigView {
+  enabled: boolean;
+  url: string;
+  branchId: string | null;
+  deviceId: string | null;
+  hasToken: boolean;
+  status: PosWsClientStatus;
+}
+
+export interface PosWsConfigPatch {
+  enabled?: boolean;
+  url?: string;
+  branchId?: string | null;
+  deviceId?: string | null;
+  token?: string;
+}
+
+export interface PosWsLogEntry {
+  id: string;
+  at: string;
+  level: 'INFO' | 'WARN' | 'ERROR';
+  message: string;
+  detail?: string;
+}
+
+/** Renderer-bound request for an order received from the website. */
+export interface PosWsIncomingOrder {
+  eventId: string;
+  order: PosWsOrderCreatedPayload;
+}
+
+/** Renderer-bound request asking for the catalog + processed-order snapshot. */
+export interface PosWsSnapshotRequest {
+  requestId: string;
+}
+
+/**
+ * Durable record mapping a website event to the POS order it produced. Used to
+ * reject duplicate deliveries so retries never create a second order.
+ */
+export interface PosWsProcessedEvent {
+  eventId: string;
+  orderId: string;
+  orderNumber: string;
+  total: number;
+  channel: OrderChannel;
+  source: string;
+  processedAt: string;
+}
+
+export interface PosWsState {
+  id: 'current';
+  catalogVersion: number;
+  catalogHash: string;
+  updatedAt: string;
 }

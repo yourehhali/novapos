@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from 'electron';
 import { execFile } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { writeFile, unlink } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
@@ -8,10 +9,16 @@ import { promisify } from 'node:util';
 import {
   PocketServer,
   type PocketCatalogPayload,
+  type PocketHistoryPayload,
   type PocketOrderRequest,
   type PocketOrderResult,
+  type PocketPayRequest,
+  type PocketPayResult,
   type PocketServerStatus,
 } from './pocket-server';
+import { PosWsClient, type PosWsClientStatus, type PosWsLogEntry, type PosWsOrderResultPayload, type PosWsSnapshot } from './pos-ws-client';
+import type { PosWsCatalogPayload, PosWsOrderCreatedPayload } from './ws-protocol';
+import { loadPosWsConfig, savePosWsConfig, type PosWsStoredConfig } from './ws-credentials';
 
 type TicketKind = 'KITCHEN' | 'PAYMENT';
 
@@ -36,6 +43,7 @@ interface TicketLayoutOverride {
   logoType?: LogoType;
   logoText?: string;
   logoImageDataUrl?: string;
+  logoScale?: number;
   heading?: string;
   subheading?: string;
   footerLine1?: string;
@@ -48,6 +56,7 @@ interface ResolvedTicketLayout {
   logoType: LogoType;
   logoText: string;
   logoImageDataUrl: string;
+  logoScale: number;
   heading: string;
   subheading: string;
   footerLine1: string;
@@ -84,6 +93,7 @@ const DEFAULT_RESOLVED_LAYOUTS: Record<'payment' | 'kitchen', ResolvedTicketLayo
     logoType: 'TEXT',
     logoText: '',
     logoImageDataUrl: '',
+    logoScale: 50,
     heading: 'Ticket Commande',
     subheading: '',
     footerLine1: 'Merci pour votre visite',
@@ -95,6 +105,7 @@ const DEFAULT_RESOLVED_LAYOUTS: Record<'payment' | 'kitchen', ResolvedTicketLayo
     logoType: 'TEXT',
     logoText: '',
     logoImageDataUrl: '',
+    logoScale: 50,
     heading: 'Ticket Cuisine',
     subheading: '',
     footerLine1: '',
@@ -116,6 +127,7 @@ function resolveTicketLayout(
         logoType: (settings.logoType ?? fallback.logoType) as LogoType,
         logoText: settings.logoText ?? fallback.logoText,
         logoImageDataUrl: settings.logoImageDataUrl ?? fallback.logoImageDataUrl,
+        logoScale: fallback.logoScale,
         heading: fallback.heading,
         subheading: '',
         footerLine1: '',
@@ -127,6 +139,7 @@ function resolveTicketLayout(
         logoType: (settings.logoType ?? fallback.logoType) as LogoType,
         logoText: settings.logoText ?? fallback.logoText,
         logoImageDataUrl: settings.logoImageDataUrl ?? fallback.logoImageDataUrl,
+        logoScale: fallback.logoScale,
         heading: settings.ticketHeading ?? fallback.heading,
         subheading: settings.ticketSubheading ?? fallback.subheading,
         footerLine1: settings.footerLine1 ?? fallback.footerLine1,
@@ -138,6 +151,7 @@ function resolveTicketLayout(
     logoType: ((override?.logoType ?? topFallback.logoType) || 'TEXT') as LogoType,
     logoText: override?.logoText ?? topFallback.logoText,
     logoImageDataUrl: override?.logoImageDataUrl ?? topFallback.logoImageDataUrl,
+    logoScale: override?.logoScale ?? topFallback.logoScale,
     heading: override?.heading ?? topFallback.heading,
     subheading: override?.subheading ?? topFallback.subheading,
     footerLine1: override?.footerLine1 ?? topFallback.footerLine1,
@@ -235,7 +249,6 @@ const BUSINESS_NAME = 'Rox Agency';
 const WIFI_PASSWORD = 'ladiesfirst';
 const BUNDLED_LOGO_PATH = path.join('electron', 'assets', 'logo-black.png');
 const BUNDLED_APP_ICON_PATH = path.join('media', 'icon.png');
-const WORKSPACE_LOGO_PATH = '/Users/macadmin/Documents/pos.rox.ma/POS/AlmaniNafris/auth/logo-black.png';
 
 let cachedTicketLogo: Electron.NativeImage | null | undefined;
 let cachedAppIcon: Electron.NativeImage | null | undefined;
@@ -330,6 +343,13 @@ function createMainWindow(): BrowserWindow {
 
 let pocketServer: PocketServer | null = null;
 const pendingPocketOrders = new Map<string, (result: PocketOrderResult) => void>();
+const pendingPocketPay = new Map<string, (result: PocketPayResult) => void>();
+const pendingPocketHistory = new Map<string, (payload: PocketHistoryPayload) => void>();
+
+const EMPTY_POCKET_HISTORY: PocketHistoryPayload = {
+  orders: [],
+  stats: { orderCount: 0, paidCount: 0, unpaidCount: 0, totalCollected: 0, currency: '' },
+};
 
 function emptyPocketStatus(): PocketServerStatus {
   return {
@@ -355,6 +375,8 @@ function ensurePocketServer(): PocketServer {
   pocketServer = new PocketServer({
     staticDir: pocketStaticDir(),
     handleOrder: (order, meta) => requestRendererOrder(order, meta),
+    handleHistory: (meta) => requestRendererHistory(meta),
+    handlePay: (pay, meta) => requestRendererPay(pay, meta),
     onStatusChange: (status) => {
       mainWindow?.webContents.send('RoxPos:pocket-status', status);
     },
@@ -365,7 +387,7 @@ function ensurePocketServer(): PocketServer {
 
 function requestRendererOrder(
   order: PocketOrderRequest,
-  meta: { requestId: string; deviceLabel: string },
+  meta: { requestId: string; deviceId: string; deviceLabel: string },
 ): Promise<PocketOrderResult> {
   const window = mainWindow;
   if (!window || window.isDestroyed()) {
@@ -383,6 +405,45 @@ function requestRendererOrder(
       deliveryAddress: order.deliveryAddress,
       note: order.note,
       lines: order.lines,
+      deviceId: meta.deviceId,
+      deviceLabel: meta.deviceLabel,
+    });
+  });
+}
+
+function requestRendererHistory(meta: { deviceId: string; deviceLabel: string }): Promise<PocketHistoryPayload> {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) {
+    return Promise.resolve(EMPTY_POCKET_HISTORY);
+  }
+
+  const requestId = randomBytes(8).toString('hex');
+  return new Promise<PocketHistoryPayload>((resolve) => {
+    pendingPocketHistory.set(requestId, resolve);
+    window.webContents.send('RoxPos:pocket-history', {
+      requestId,
+      deviceId: meta.deviceId,
+      deviceLabel: meta.deviceLabel,
+    });
+  });
+}
+
+function requestRendererPay(
+  pay: PocketPayRequest,
+  meta: { requestId: string; deviceId: string; deviceLabel: string },
+): Promise<PocketPayResult> {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) {
+    return Promise.resolve({ ok: false, error: 'Caisse indisponible.' });
+  }
+
+  return new Promise<PocketPayResult>((resolve) => {
+    pendingPocketPay.set(meta.requestId, resolve);
+    window.webContents.send('RoxPos:pocket-pay', {
+      requestId: meta.requestId,
+      orderId: pay.orderId,
+      paymentMethod: pay.paymentMethod,
+      deviceId: meta.deviceId,
       deviceLabel: meta.deviceLabel,
     });
   });
@@ -410,6 +471,152 @@ function registerPocketApi(): void {
       if (resolve) {
         pendingPocketOrders.delete(requestId);
         resolve(result);
+      }
+      return { ok: true };
+    },
+  );
+  ipcMain.handle(
+    'RoxPos:pocket-resolve-pay',
+    (_event, requestId: string, result: PocketPayResult) => {
+      const resolve = pendingPocketPay.get(requestId);
+      if (resolve) {
+        pendingPocketPay.delete(requestId);
+        resolve(result);
+      }
+      return { ok: true };
+    },
+  );
+  ipcMain.handle(
+    'RoxPos:pocket-resolve-history',
+    (_event, requestId: string, payload: PocketHistoryPayload) => {
+      const resolve = pendingPocketHistory.get(requestId);
+      if (resolve) {
+        pendingPocketHistory.delete(requestId);
+        resolve(payload);
+      }
+      return { ok: true };
+    },
+  );
+}
+
+let posWsClient: PosWsClient | null = null;
+let posWsConfig: PosWsStoredConfig | null = null;
+const pendingWsOrders = new Map<string, (result: PosWsOrderResultPayload) => void>();
+const pendingWsSnapshots = new Map<string, (snapshot: PosWsSnapshot) => void>();
+
+const EMPTY_WS_SNAPSHOT: PosWsSnapshot = { catalog: null, orders: [] };
+
+async function ensurePosWsClient(): Promise<PosWsClient> {
+  if (posWsClient) {
+    return posWsClient;
+  }
+
+  posWsConfig = posWsConfig ?? (await loadPosWsConfig());
+  posWsClient = new PosWsClient({
+    config: { ...posWsConfig, posVersion: app.getVersion() },
+    handleOrder: (eventId, order) => requestRendererWsOrder(eventId, order),
+    requestSnapshot: () => requestRendererWsSnapshot(),
+    onStatus: (status: PosWsClientStatus) => {
+      mainWindow?.webContents.send('RoxPos:ws-status', status);
+    },
+    onLog: (entry: PosWsLogEntry) => {
+      mainWindow?.webContents.send('RoxPos:ws-log', entry);
+    },
+  });
+
+  return posWsClient;
+}
+
+function requestRendererWsOrder(
+  eventId: string,
+  order: PosWsOrderCreatedPayload,
+): Promise<PosWsOrderResultPayload> {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) {
+    return Promise.resolve({ ok: false, code: 'pos_unavailable', message: 'Caisse indisponible.' });
+  }
+
+  return new Promise<PosWsOrderResultPayload>((resolve) => {
+    pendingWsOrders.set(eventId, resolve);
+    window.webContents.send('RoxPos:ws-order', { eventId, order });
+  });
+}
+
+function requestRendererWsSnapshot(): Promise<PosWsSnapshot> {
+  const window = mainWindow;
+  if (!window || window.isDestroyed()) {
+    return Promise.resolve(EMPTY_WS_SNAPSHOT);
+  }
+
+  const requestId = randomBytes(8).toString('hex');
+  return new Promise<PosWsSnapshot>((resolve) => {
+    pendingWsSnapshots.set(requestId, resolve);
+    window.webContents.send('RoxPos:ws-snapshot-request', { requestId });
+  });
+}
+
+function registerPosWsApi(): void {
+  ipcMain.handle('RoxPos:ws-get-status', async () => (await ensurePosWsClient()).status());
+
+  ipcMain.handle('RoxPos:ws-get-config', async () => {
+    const client = await ensurePosWsClient();
+    const config = posWsConfig ?? (await loadPosWsConfig());
+    return {
+      enabled: config.enabled,
+      url: config.url,
+      branchId: config.branchId,
+      deviceId: config.deviceId,
+      hasToken: Boolean(config.token),
+      status: client.status(),
+    };
+  });
+
+  ipcMain.handle('RoxPos:ws-set-config', async (_event, patch: Partial<PosWsStoredConfig>) => {
+    const client = await ensurePosWsClient();
+    const current = posWsConfig ?? (await loadPosWsConfig());
+    const next: PosWsStoredConfig = {
+      enabled: patch.enabled ?? current.enabled,
+      url: (patch.url ?? current.url).trim(),
+      branchId: patch.branchId !== undefined ? patch.branchId : current.branchId,
+      deviceId: patch.deviceId !== undefined ? patch.deviceId : current.deviceId,
+      tenantId: patch.tenantId !== undefined ? patch.tenantId : current.tenantId,
+      token: patch.token !== undefined ? patch.token.trim() : current.token,
+    };
+    posWsConfig = await savePosWsConfig(next);
+    return client.updateConfig({ ...posWsConfig, posVersion: app.getVersion() });
+  });
+
+  ipcMain.handle('RoxPos:ws-connect', async () => (await ensurePosWsClient()).start());
+
+  ipcMain.handle('RoxPos:ws-disconnect', async () => (await ensurePosWsClient()).stop());
+
+  ipcMain.handle('RoxPos:ws-push-catalog', async (_event, catalog: PosWsCatalogPayload) => {
+    const client = await ensurePosWsClient();
+    client.pushCatalog(catalog);
+    return { ok: true };
+  });
+
+  ipcMain.handle('RoxPos:ws-get-logs', async () => (await ensurePosWsClient()).getLogs());
+
+  ipcMain.handle(
+    'RoxPos:ws-resolve-order',
+    (_event, eventId: string, result: PosWsOrderResultPayload) => {
+      const resolve = pendingWsOrders.get(eventId);
+      if (resolve) {
+        pendingWsOrders.delete(eventId);
+        resolve(result);
+      }
+      return { ok: true };
+    },
+  );
+
+  ipcMain.handle(
+    'RoxPos:ws-resolve-snapshot',
+    (_event, requestId: string, snapshot: PosWsSnapshot) => {
+      const resolve = pendingWsSnapshots.get(requestId);
+      if (resolve) {
+        pendingWsSnapshots.delete(requestId);
+        resolve(snapshot);
       }
       return { ok: true };
     },
@@ -771,7 +978,6 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
   );
 
   const headerMeta: string[] = [
-    request.order.orderNumber,
     `${request.kind === 'KITCHEN' ? 'PREPARE' : 'PAYE'} ${printedAt}`,
   ];
   for (const line of formatChannelEscPos(request.order)) {
@@ -786,6 +992,7 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     request.kind === 'KITCHEN' ? 'TICKET CUISINE' : 'TICKET PAIEMENT',
     headerMeta,
     request.settings,
+    request.order.orderNumber,
   );
   chunks.push(alignLeft());
   chunks.push(textLine('-'.repeat(width)));
@@ -1019,6 +1226,7 @@ function appendTicketHeader(
   title: string,
   metaLines: string[],
   settings: TicketBusinessSettings | undefined,
+  emphasizedLine?: string,
 ): void {
   const width = getCharactersPerLine(printer);
   const layout = resolveTicketLayout(settings, kind);
@@ -1027,10 +1235,13 @@ function appendTicketHeader(
   const subheading = layout.subheading?.trim();
 
   chunks.push(alignCenter());
-  const logoChunk = buildLogoEscPosChunk(printer, layout);
+  // An IMAGE logo shrunk to 0% is intentionally hidden, so skip both the raster
+  // and the text fallback instead of printing the business name instead.
+  const imageLogoSuppressed = layout.logoType === 'IMAGE' && (layout.logoScale ?? 50) <= 0;
+  const logoChunk = imageLogoSuppressed ? null : buildLogoEscPosChunk(printer, layout);
   if (logoChunk) chunks.push(logoChunk);
 
-  if (!logoChunk || layout.logoType !== 'IMAGE') {
+  if (!imageLogoSuppressed && (!logoChunk || layout.logoType !== 'IMAGE')) {
     const logoTextSource = layout.logoType === 'TEXT' && layout.logoText?.trim()
       ? layout.logoText.trim()
       : layout.logoText?.trim() || businessName;
@@ -1057,6 +1268,19 @@ function appendTicketHeader(
     for (const line of wrapText(sanitizeForEscPos(subheading), width)) {
       chunks.push(textLine(line));
     }
+  }
+
+  // The ticket ID (T01-001, W00001, E00001) is the key identifier staff look
+  // for, so it is printed bold and at double height/width. Double-width glyphs
+  // halve the usable character columns, hence the width / 2 wrapping.
+  if (emphasizedLine?.trim()) {
+    chunks.push(bold(true));
+    chunks.push(doubleHeightWidth(true));
+    for (const line of wrapText(sanitizeForEscPos(emphasizedLine.trim()), Math.max(4, Math.floor(width / 2)))) {
+      chunks.push(textLine(line));
+    }
+    chunks.push(doubleHeightWidth(false));
+    chunks.push(bold(false));
   }
 
   for (const metaLine of metaLines) {
@@ -1115,10 +1339,17 @@ function buildLogoEscPosChunk(
   if (!logo) return null;
 
   const paperWidthMm = printer?.paperWidthMm ?? 80;
-  const maxWidthDots = paperWidthMm <= 58 ? 200 : 280;
-  const maxHeightDots = paperWidthMm <= 58 ? 96 : 116;
+  const printableWidthDots = paperWidthMm <= 58 ? 384 : 576;
+  // logoScale is the logo width as a percentage (0-100) of the printable ticket
+  // width: 100 spans the full width, 0 hides the logo. The aspect ratio is
+  // always preserved, so the height follows from the (width-limited) ratio and
+  // is capped at one full width to keep the header from ballooning.
+  const scalePercent = Math.min(100, Math.max(0, layout.logoScale ?? 50)) / 100;
+  if (scalePercent <= 0) return null;
+  const maxWidthDots = Math.round(printableWidthDots * scalePercent);
+  const maxHeightDots = printableWidthDots;
   const sourceSize = logo.getSize();
-  const scale = Math.min(maxWidthDots / sourceSize.width, maxHeightDots / sourceSize.height, 1);
+  const scale = Math.min(maxWidthDots / sourceSize.width, maxHeightDots / sourceSize.height);
   const targetWidth = Math.max(8, Math.floor((sourceSize.width * scale) / 8) * 8);
   const targetHeight = Math.max(8, Math.floor(sourceSize.height * scale));
   const resized = logo.resize({
@@ -1168,7 +1399,6 @@ function getTicketLogoImage(): Electron.NativeImage | null {
   const logoCandidates = [
     path.join(app.getAppPath(), BUNDLED_LOGO_PATH),
     path.join(process.cwd(), BUNDLED_LOGO_PATH),
-    WORKSPACE_LOGO_PATH,
   ];
 
   for (const candidate of logoCandidates) {
@@ -1739,7 +1969,14 @@ function escapeHtml(value: string): string {
 app.whenReady().then(() => {
   registerDesktopApi();
   registerPocketApi();
+  registerPosWsApi();
   mainWindow = createMainWindow();
+
+  // The WebSocket client round-trips to the renderer for catalog/orders, so it
+  // only starts once the renderer is loaded.
+  mainWindow.webContents.once('did-finish-load', () => {
+    void ensurePosWsClient().then((client) => client.start());
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -1756,4 +1993,5 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   void pocketServer?.stop();
+  posWsClient?.stop();
 });

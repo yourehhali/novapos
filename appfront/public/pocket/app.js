@@ -46,6 +46,11 @@
     checkoutBtn: document.getElementById('checkout-btn'),
     doneDetail: document.getElementById('done-detail'),
     againBtn: document.getElementById('again-btn'),
+    ordersBtn: document.getElementById('orders-btn'),
+    ordersNewBtn: document.getElementById('orders-new-btn'),
+    statsGrid: document.getElementById('stats-grid'),
+    orderList: document.getElementById('order-list'),
+    ordersError: document.getElementById('orders-error'),
   };
 
   var screens = {
@@ -53,6 +58,7 @@
     menu: document.getElementById('screen-menu'),
     checkout: document.getElementById('screen-checkout'),
     done: document.getElementById('screen-done'),
+    orders: document.getElementById('screen-orders'),
   };
 
   function showScreen(name) {
@@ -61,6 +67,7 @@
     });
     el.cartbar.hidden = name !== 'menu' && name !== 'checkout';
     el.resetBtn.hidden = name === 'pair';
+    el.ordersBtn.hidden = name === 'pair' || name === 'orders';
   }
 
   function api(path, options) {
@@ -278,6 +285,147 @@
     el.cartbar.hidden = totals.count === 0 || (screens.menu.classList.contains('hidden') && screens.checkout.classList.contains('hidden'));
   }
 
+  var CHANNEL_LABELS = {
+    SUR_PLACE: 'Sur place',
+    EMPORTER: 'A emporter',
+    LIVRAISON: 'Livraison',
+  };
+
+  function renderStats(stats) {
+    var safe = stats || { orderCount: 0, paidCount: 0, unpaidCount: 0, totalCollected: 0 };
+    var cells = [
+      { label: 'Commandes', value: String(safe.orderCount || 0) },
+      { label: 'Payees', value: String(safe.paidCount || 0) },
+      { label: 'Impayees', value: String(safe.unpaidCount || 0) },
+      { label: 'Encaisse', value: money(safe.totalCollected || 0) },
+    ];
+    el.statsGrid.innerHTML = '';
+    cells.forEach(function (cell) {
+      var box = document.createElement('div');
+      box.className = 'stat';
+      var value = document.createElement('strong');
+      value.textContent = cell.value;
+      var label = document.createElement('span');
+      label.textContent = cell.label;
+      box.appendChild(value);
+      box.appendChild(label);
+      el.statsGrid.appendChild(box);
+    });
+  }
+
+  function renderOrders(payload) {
+    var orders = (payload && payload.orders) || [];
+    renderStats(payload && payload.stats);
+    el.orderList.innerHTML = '';
+
+    if (orders.length === 0) {
+      var empty = document.createElement('p');
+      empty.className = 'muted';
+      empty.textContent = 'Aucune commande pour cet appareil.';
+      el.orderList.appendChild(empty);
+      return;
+    }
+
+    orders.forEach(function (order) {
+      var row = document.createElement('div');
+      row.className = 'order' + (order.status === 'PAID' ? ' paid' : '');
+
+      var head = document.createElement('div');
+      head.className = 'order-head';
+      var id = document.createElement('strong');
+      id.className = 'order-id';
+      id.textContent = order.orderNumber;
+      var total = document.createElement('span');
+      total.className = 'order-total';
+      total.textContent = money(order.total);
+      head.appendChild(id);
+      head.appendChild(total);
+
+      var meta = document.createElement('div');
+      meta.className = 'order-meta';
+      var bits = [CHANNEL_LABELS[order.channel] || order.channel];
+      if (order.tableNumber) bits.push('Table ' + order.tableNumber);
+      bits.push(order.status === 'PAID' ? 'Payee' : 'Impayee');
+      meta.textContent = bits.join(' \u00b7 ');
+
+      row.appendChild(head);
+      row.appendChild(meta);
+
+      if (order.status !== 'PAID') {
+        var actions = document.createElement('div');
+        actions.className = 'order-actions';
+
+        var method = document.createElement('select');
+        var cash = document.createElement('option');
+        cash.value = 'CASH';
+        cash.textContent = 'Especes';
+        var card = document.createElement('option');
+        card.value = 'CARD';
+        card.textContent = 'Carte';
+        method.appendChild(cash);
+        method.appendChild(card);
+
+        var payBtn = document.createElement('button');
+        payBtn.type = 'button';
+        payBtn.className = 'primary small';
+        payBtn.textContent = 'Encaisser & imprimer';
+        payBtn.addEventListener('click', function () {
+          payOrder(order.orderId, method.value, payBtn);
+        });
+
+        actions.appendChild(method);
+        actions.appendChild(payBtn);
+        row.appendChild(actions);
+      }
+
+      el.orderList.appendChild(row);
+    });
+  }
+
+  function loadOrders() {
+    el.ordersError.hidden = true;
+    return api('/api/orders')
+      .then(function (payload) {
+        renderOrders(payload);
+        showScreen('orders');
+      })
+      .catch(function (error) {
+        if (error.status === 401) {
+          handleUnauthorized();
+          return;
+        }
+        showScreen('orders');
+        el.ordersError.textContent = error.message || 'Chargement impossible.';
+        el.ordersError.hidden = false;
+      });
+  }
+
+  function payOrder(orderId, paymentMethod, button) {
+    if (button) button.disabled = true;
+    el.ordersError.hidden = true;
+    api('/api/pay', { method: 'POST', body: { orderId: orderId, paymentMethod: paymentMethod } })
+      .then(function (result) {
+        if (!result || !result.ok) {
+          el.ordersError.textContent =
+            (result && result.error) || "Le paiement n'a pas pu etre effectue.";
+          el.ordersError.hidden = false;
+          return;
+        }
+        return loadOrders();
+      })
+      .catch(function (error) {
+        if (error.status === 401) {
+          handleUnauthorized();
+          return;
+        }
+        el.ordersError.textContent = error.message || "Le paiement n'a pas pu etre effectue.";
+        el.ordersError.hidden = false;
+      })
+      .then(function () {
+        if (button) button.disabled = false;
+      });
+  }
+
   function setChannel(channel) {
     state.channel = channel;
     Array.prototype.forEach.call(el.channelChips.children, function (chip) {
@@ -448,6 +596,13 @@
     });
     el.submitBtn.addEventListener('click', submitOrder);
     el.againBtn.addEventListener('click', function () {
+      showScreen('menu');
+      renderCart();
+    });
+    el.ordersBtn.addEventListener('click', function () {
+      loadOrders();
+    });
+    el.ordersNewBtn.addEventListener('click', function () {
       showScreen('menu');
       renderCart();
     });

@@ -1,0 +1,108 @@
+<article class="panel">
+  <p class="eyebrow">{{ lang.t('settings.posws.eyebrow') }}</p>
+  <h1>{{ lang.t('settings.posws.title') }}</h1>
+  <p class="muted">{{ lang.t('settings.posws.intro') }}</p>
+
+  <div class="setting-card" *ngIf="!isDesktop()">
+    <p>{{ lang.t('settings.posws.desktopOnly') }}</p>
+  </div>
+
+  <ng-container *ngIf="isDesktop()">
+    <div class="setting-card">
+      <div class="setting-head">
+        <strong>{{ enabled() ? lang.t('settings.posws.enabled') : lang.t('settings.posws.disabled') }}</strong>
+        <span class="badge" [class.on]="stateOn()">{{ stateLabel() }}</span>
+      </div>
+      <p class="muted-line">{{ status()?.url }}</p>
+      <button type="button" class="toggle" [disabled]="busy()" (click)="toggleEnabled()">
+        {{ enabled() ? lang.t('settings.posws.disable') : lang.t('settings.posws.enable') }}
+      </button>
+    </div>
+
+    <div class="setting-card">
+      <label class="field">
+        <span class="field-label">{{ lang.t('settings.posws.url') }}</span>
+        <input
+          type="text"
+          [ngModel]="urlDraft()"
+          (ngModelChange)="urlDraft.set($event)"
+          [disabled]="busy()"
+        />
+      </label>
+
+      <label class="field">
+        <span class="field-label">{{ lang.t('settings.posws.deviceId') }}</span>
+        <input
+          type="text"
+          [ngModel]="deviceDraft()"
+          (ngModelChange)="deviceDraft.set($event)"
+          [disabled]="busy()"
+        />
+      </label>
+
+      <label class="field">
+        <span class="field-label">{{ lang.t('settings.posws.token') }}</span>
+        <input
+          type="password"
+          [ngModel]="tokenDraft()"
+          (ngModelChange)="tokenDraft.set($event)"
+          [placeholder]="hasToken() ? lang.t('settings.posws.tokenStored') : lang.t('settings.posws.tokenPlaceholder')"
+          [disabled]="busy()"
+          autocomplete="off"
+        />
+      </label>
+
+      <div class="actions">
+        <button type="button" class="ghost" [disabled]="busy()" (click)="saveConnection()">
+          {{ lang.t('settings.posws.save') }}
+        </button>
+        <button type="button" class="ghost" [disabled]="busy() || !enabled()" (click)="connect()">
+          {{ lang.t('settings.posws.connect') }}
+        </button>
+        <button type="button" class="ghost" [disabled]="busy()" (click)="disconnect()">
+          {{ lang.t('settings.posws.disconnect') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="setting-card" *ngIf="status() as info">
+      <div class="metric">
+        <span>{{ lang.t('settings.posws.catalogVersion') }}</span>
+        <strong>{{ info.catalogVersion ?? '—' }}</strong>
+      </div>
+      <div class="metric">
+        <span>{{ lang.t('settings.posws.catalogHash') }}</span>
+        <strong class="mono">{{ info.catalogHash || '—' }}</strong>
+      </div>
+      <div class="metric">
+        <span>{{ lang.t('settings.posws.ackVersion') }}</span>
+        <strong>{{ info.ackedCatalogVersion ?? '—' }}</strong>
+      </div>
+      <div class="metric">
+        <span>{{ lang.t('settings.posws.reconnectAttempt') }}</span>
+        <strong>{{ info.reconnectAttempt }}</strong>
+      </div>
+      <div class="metric">
+        <span>{{ lang.t('settings.posws.pendingOrders') }}</span>
+        <strong>{{ info.pendingOrders }}</strong>
+      </div>
+      <div class="metric" *ngIf="info.connectedAt">
+        <span>{{ lang.t('settings.posws.connectedAt') }}</span>
+        <strong>{{ formatTime(info.connectedAt) }}</strong>
+      </div>
+      <p class="error" *ngIf="info.lastError">{{ info.lastError }}</p>
+    </div>
+
+    <div class="setting-card">
+      <strong>{{ lang.t('settings.posws.logs') }}</strong>
+      <p class="muted-line" *ngIf="combinedLogs().length === 0">{{ lang.t('settings.posws.noLogs') }}</p>
+      <div class="log" *ngFor="let entry of combinedLogs()">
+        <span class="log-level" [ngClass]="entry.level.toLowerCase()">{{ entry.level }}</span>
+        <span class="log-time">{{ formatTime(entry.at) }}</span>
+        <span class="log-message">{{ entry.message }}</span>
+      </div>
+    </div>
+  </ng-container>
+
+  <p class="error" *ngIf="error()">{{ error() }}</p>
+</article>

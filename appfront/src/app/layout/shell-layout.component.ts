@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { AfterViewInit, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Subject, takeUntil } from 'rxjs';
 import { NetworkService } from '../core/services/network.service';
 import { SessionService } from '../core/services/session.service';
@@ -7,6 +7,9 @@ import { BusinessSettingsService } from '../core/services/business-settings.serv
 import { WorkspaceService } from '../core/services/workspace.service';
 import { DesktopBridgeService } from '../core/services/desktop-bridge.service';
 import { LanguageService } from '../core/i18n/language.service';
+
+/** Movement (px) before a mouse press is treated as a panning drag instead of a click. */
+const DRAG_PAN_THRESHOLD = 5;
 
 @Component({
   selector: 'app-shell-layout',
@@ -147,6 +150,7 @@ import { LanguageService } from '../core/i18n/language.service';
       </main>
 
       <app-modal></app-modal>
+      <app-virtual-keyboard></app-virtual-keyboard>
     </div>
   `,
   styles: [
@@ -486,7 +490,7 @@ import { LanguageService } from '../core/i18n/language.service';
   ],
   standalone: false,
 })
-export class ShellLayoutComponent implements OnInit, OnDestroy {
+export class ShellLayoutComponent implements OnInit, OnDestroy, AfterViewInit {
   protected readonly session = inject(SessionService);
   protected readonly network = inject(NetworkService);
   protected readonly sync = inject(SyncService);
@@ -499,6 +503,18 @@ export class ShellLayoutComponent implements OnInit, OnDestroy {
   protected readonly storedBusinessName = signal<string | null>(null);
   protected readonly businessName = computed(() => this.storedBusinessName() ?? this.session.user()?.businessName ?? 'Almani Nafris');
   private readonly destroy$ = new Subject<void>();
+
+  /** Mouse "drag to scroll" gesture state (touch devices already scroll natively). */
+  private dragPan: {
+    pointerId: number;
+    startX: number;
+    startY: number;
+    lastX: number;
+    lastY: number;
+    dragging: boolean;
+    scroller: HTMLElement | null;
+  } | null = null;
+  private suppressClick = false;
 
   protected readonly brandMark = computed(() => {
     const name = this.businessName()?.trim() ?? '';
@@ -534,9 +550,151 @@ export class ShellLayoutComponent implements OnInit, OnDestroy {
       });
   }
 
+  ngAfterViewInit(): void {
+    document.addEventListener('pointerdown', this.onDragPanStart);
+    document.addEventListener('click', this.onDragPanClick, true);
+  }
+
   ngOnDestroy(): void {
+    document.removeEventListener('pointerdown', this.onDragPanStart);
+    document.removeEventListener('click', this.onDragPanClick, true);
+    this.teardownDragPan();
+
     this.destroy$.next();
     this.destroy$.complete();
+  }
+
+  private readonly onDragPanStart = (event: PointerEvent): void => {
+    // Touch and pen already scroll natively; only emulate it for mouse drags.
+    if (event.pointerType !== 'mouse' || event.button !== 0 || this.dragPan) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | null;
+    if (!target || this.isDragPanExcluded(target)) {
+      return;
+    }
+
+    this.dragPan = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      dragging: false,
+      scroller: this.resolveDragPanScroller(target),
+    };
+
+    window.addEventListener('pointermove', this.onDragPanMove, { passive: false });
+    window.addEventListener('pointerup', this.onDragPanEnd);
+    window.addEventListener('pointercancel', this.onDragPanEnd);
+  };
+
+  private readonly onDragPanMove = (event: PointerEvent): void => {
+    const state = this.dragPan;
+    if (!state || event.pointerId !== state.pointerId) {
+      return;
+    }
+
+    const dx = event.clientX - state.lastX;
+    const dy = event.clientY - state.lastY;
+
+    if (!state.dragging) {
+      if (
+        Math.abs(event.clientX - state.startX) < DRAG_PAN_THRESHOLD &&
+        Math.abs(event.clientY - state.startY) < DRAG_PAN_THRESHOLD
+      ) {
+        return;
+      }
+      state.dragging = true;
+      document.body.classList.add('drag-panning');
+    }
+
+    state.lastX = event.clientX;
+    state.lastY = event.clientY;
+
+    event.preventDefault();
+    this.scrollBy(state.scroller, dx, dy);
+  };
+
+  private readonly onDragPanEnd = (event: PointerEvent): void => {
+    const state = this.dragPan;
+    if (!state || event.pointerId !== state.pointerId) {
+      return;
+    }
+
+    if (state.dragging) {
+      // Swallow the click that follows a drag so the element under the cursor
+      // is not activated (buttons, links, product tiles...).
+      this.suppressClick = true;
+      window.setTimeout(() => {
+        this.suppressClick = false;
+      }, 300);
+    }
+
+    this.teardownDragPan();
+  };
+
+  private readonly onDragPanClick = (event: MouseEvent): void => {
+    if (!this.suppressClick) {
+      return;
+    }
+    this.suppressClick = false;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
+  private teardownDragPan(): void {
+    this.dragPan = null;
+    document.body.classList.remove('drag-panning');
+    window.removeEventListener('pointermove', this.onDragPanMove);
+    window.removeEventListener('pointerup', this.onDragPanEnd);
+    window.removeEventListener('pointercancel', this.onDragPanEnd);
+  }
+
+  private scrollBy(scroller: HTMLElement | null, dx: number, dy: number): void {
+    if (scroller) {
+      scroller.scrollLeft -= dx;
+      scroller.scrollTop -= dy;
+      return;
+    }
+    window.scrollBy(-dx, -dy);
+  }
+
+  /** The page scrolls the main content by default; fall back to the nearest scrollable box. */
+  private resolveDragPanScroller(target: HTMLElement): HTMLElement | null {
+    const doc = (document.scrollingElement ?? document.documentElement) as HTMLElement;
+    if (doc.scrollHeight > doc.clientHeight + 1) {
+      return null;
+    }
+
+    let node: HTMLElement | null = target;
+    while (node && node !== document.body) {
+      if (this.isScrollable(node)) {
+        return node;
+      }
+      node = node.parentElement;
+    }
+    return null;
+  }
+
+  private isScrollable(node: HTMLElement): boolean {
+    const style = window.getComputedStyle(node);
+    const scrollableY = /(auto|scroll)/.test(style.overflowY) && node.scrollHeight > node.clientHeight + 1;
+    const scrollableX = /(auto|scroll)/.test(style.overflowX) && node.scrollWidth > node.clientWidth + 1;
+    return scrollableY || scrollableX;
+  }
+
+  /** Form controls handle their own drag (text selection, range thumbs, etc.). */
+  private isDragPanExcluded(target: HTMLElement): boolean {
+    const tag = target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'OPTION') {
+      return true;
+    }
+    if (target.isContentEditable) {
+      return true;
+    }
+    return !!target.closest('[data-drag-pan-ignore]');
   }
 
   protected toggleSidebar(): void {

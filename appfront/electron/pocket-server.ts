@@ -67,6 +67,47 @@ export interface PocketOrderResult {
   error?: string;
 }
 
+export interface PocketOrderSummary {
+  orderId: string;
+  orderNumber: string;
+  channel: 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON';
+  status: 'PREPARED' | 'PAID';
+  paymentMethod: 'CASH' | 'CARD' | 'UNPAID';
+  total: number;
+  currency: string;
+  tableNumber?: string;
+  lineCount: number;
+  createdAt: string;
+  paidAt?: string;
+}
+
+export interface PocketStats {
+  orderCount: number;
+  paidCount: number;
+  unpaidCount: number;
+  totalCollected: number;
+  currency: string;
+}
+
+export interface PocketHistoryPayload {
+  orders: PocketOrderSummary[];
+  stats: PocketStats;
+}
+
+export interface PocketPayRequest {
+  orderId: string;
+  paymentMethod: 'CASH' | 'CARD';
+}
+
+export interface PocketPayResult {
+  ok: boolean;
+  orderId?: string;
+  orderNumber?: string;
+  total?: number;
+  printed?: boolean;
+  error?: string;
+}
+
 export interface PocketDeviceInfo {
   id: string;
   label: string;
@@ -86,7 +127,15 @@ export interface PocketServerStatus {
 
 export interface PocketServerOptions {
   staticDir: string;
-  handleOrder: (order: PocketOrderRequest, meta: { requestId: string; deviceLabel: string }) => Promise<PocketOrderResult>;
+  handleOrder: (
+    order: PocketOrderRequest,
+    meta: { requestId: string; deviceId: string; deviceLabel: string },
+  ) => Promise<PocketOrderResult>;
+  handleHistory: (meta: { deviceId: string; deviceLabel: string }) => Promise<PocketHistoryPayload>;
+  handlePay: (
+    pay: PocketPayRequest,
+    meta: { requestId: string; deviceId: string; deviceLabel: string },
+  ) => Promise<PocketPayResult>;
   onStatusChange?: (status: PocketServerStatus) => void;
 }
 
@@ -246,6 +295,16 @@ export class PocketServer {
         return;
       }
 
+      if (route === '/api/orders' && request.method === 'GET') {
+        await this.handleHistory(response, session);
+        return;
+      }
+
+      if (route === '/api/pay' && request.method === 'POST') {
+        await this.handlePay(request, response, session);
+        return;
+      }
+
       this.sendJson(response, 404, { error: 'not_found' });
       return;
     }
@@ -296,7 +355,11 @@ export class PocketServer {
     let result: PocketOrderResult;
     try {
       result = await withTimeout(
-        this.options.handleOrder(validation.order, { requestId, deviceLabel: session.label }),
+        this.options.handleOrder(validation.order, {
+          requestId,
+          deviceId: session.id,
+          deviceLabel: session.label,
+        }),
         ORDER_TIMEOUT_MS,
         { ok: false, error: 'La caisse n a pas repondu a temps.' },
       );
@@ -306,6 +369,57 @@ export class PocketServer {
 
     if (result.ok) {
       session.orderCount += 1;
+      session.lastSeenAt = Date.now();
+      this.emitStatus();
+    }
+
+    this.sendJson(response, result.ok ? 200 : 400, result);
+  }
+
+  private async handleHistory(response: ServerResponse, session: DeviceSession): Promise<void> {
+    try {
+      const payload = await withTimeout(
+        this.options.handleHistory({ deviceId: session.id, deviceLabel: session.label }),
+        ORDER_TIMEOUT_MS,
+        { orders: [], stats: emptyStats() },
+      );
+      this.sendJson(response, 200, payload);
+    } catch (error) {
+      this.sendJson(response, 500, {
+        error: error instanceof Error ? error.message : 'Erreur inconnue',
+      });
+    }
+  }
+
+  private async handlePay(
+    request: IncomingMessage,
+    response: ServerResponse,
+    session: DeviceSession,
+  ): Promise<void> {
+    const body = await readJsonBody(request);
+    const validation = validatePay(body);
+    if (!validation.ok) {
+      this.sendJson(response, 400, { error: validation.error });
+      return;
+    }
+
+    const requestId = randomBytes(8).toString('hex');
+    let result: PocketPayResult;
+    try {
+      result = await withTimeout(
+        this.options.handlePay(validation.pay, {
+          requestId,
+          deviceId: session.id,
+          deviceLabel: session.label,
+        }),
+        ORDER_TIMEOUT_MS,
+        { ok: false, error: 'La caisse n a pas repondu a temps.' },
+      );
+    } catch (error) {
+      result = { ok: false, error: error instanceof Error ? error.message : 'Erreur inconnue' };
+    }
+
+    if (result.ok) {
       session.lastSeenAt = Date.now();
       this.emitStatus();
     }
@@ -422,6 +536,10 @@ function emptyCatalog(): PocketCatalogPayload {
   return { businessName: '', currency: '', categories: [], products: [], tables: [], drivers: [] };
 }
 
+function emptyStats(): PocketStats {
+  return { orderCount: 0, paidCount: 0, unpaidCount: 0, totalCollected: 0, currency: '' };
+}
+
 function setCors(response: ServerResponse): void {
   response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -499,6 +617,26 @@ function validateOrder(
       note: asOptionalString(body['note']),
     },
   };
+}
+
+function validatePay(
+  body: Record<string, unknown> | null,
+): { ok: true; pay: PocketPayRequest } | { ok: false; error: string } {
+  if (!body) {
+    return { ok: false, error: 'Corps de requete invalide.' };
+  }
+
+  const orderId = typeof body['orderId'] === 'string' ? body['orderId'].trim() : '';
+  if (!orderId) {
+    return { ok: false, error: 'Commande introuvable.' };
+  }
+
+  const method = body['paymentMethod'];
+  if (method !== 'CASH' && method !== 'CARD') {
+    return { ok: false, error: 'Mode de paiement invalide.' };
+  }
+
+  return { ok: true, pay: { orderId, paymentMethod: method } };
 }
 
 function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {

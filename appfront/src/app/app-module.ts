@@ -16,8 +16,10 @@ import { LoginPageComponent } from './pages/login/login-page.component';
 import { OrderHistoryPageComponent } from './pages/order-history/order-history-page.component';
 import { PosPageComponent } from './pages/pos/pos-page.component';
 import { PocketPanelComponent } from './pages/settings/pocket-panel/pocket-panel.component';
+import { PosWsPanelComponent } from './pages/settings/pos-ws-panel/pos-ws-panel.component';
 import { SettingsPageComponent } from './pages/settings/settings-page.component';
 import { AppModalComponent } from './shared/components/app-modal/app-modal.component';
+import { VirtualKeyboardComponent } from './shared/components/virtual-keyboard/virtual-keyboard.component';
 
 @NgModule({
   declarations: [
@@ -30,7 +32,9 @@ import { AppModalComponent } from './shared/components/app-modal/app-modal.compo
     OrderHistoryPageComponent,
     SettingsPageComponent,
     PocketPanelComponent,
+    PosWsPanelComponent,
     AppModalComponent,
+    VirtualKeyboardComponent,
     AdminBusinessPageComponent,
     AdminBranchesPageComponent,
     AdminUsersPageComponent,

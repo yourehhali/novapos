@@ -9,10 +9,13 @@ import {
   DashboardSummary,
   DeliveryDriver,
   FloorTable,
+  PosWsProcessedEvent,
+  PosWsState,
   PrinterConfig,
   Product,
   QueueEntry,
   ReportPrintState,
+  TicketCounter,
 } from '../core/models/app.models';
 
 export interface SessionContextRecord {
@@ -42,6 +45,9 @@ export class RoxPosDbService extends Dexie {
   floorTables!: Table<FloorTable, string>;
   deliveryDrivers!: Table<DeliveryDriver, string>;
   cashOpenings!: Table<CashOpening, string>;
+  ticketCounters!: Table<TicketCounter, string>;
+  posWsEvents!: Table<PosWsProcessedEvent, string>;
+  posWsState!: Table<PosWsState, string>;
 
   constructor() {
     super('RoxPosDb');
@@ -116,6 +122,44 @@ export class RoxPosDbService extends Dexie {
       floorTables: 'id, number, zone, status',
       deliveryDrivers: 'id, number, status',
       cashOpenings: 'id, branchId, dayKey',
+    });
+
+    this.version(6).stores({
+      sessionContext: 'id',
+      bootstrapSessions: 'branchId',
+      products: 'id, categoryId, name',
+      categories: 'id, name',
+      printers: 'id, target',
+      dashboard: 'branchId',
+      eventQueue: 'eventUuid, branchId, deviceId, localStatus, deviceSequence',
+      completedOrders: 'id, branchId, createdAt, channel, tableNumber, livreurId',
+      syncCursors: 'id',
+      reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+      businessSettings: 'id',
+      floorTables: 'id, number, zone, status',
+      deliveryDrivers: 'id, number, status',
+      cashOpenings: 'id, branchId, dayKey',
+      ticketCounters: 'key',
+    });
+
+    this.version(7).stores({
+      sessionContext: 'id',
+      bootstrapSessions: 'branchId',
+      products: 'id, categoryId, name',
+      categories: 'id, name',
+      printers: 'id, target',
+      dashboard: 'branchId',
+      eventQueue: 'eventUuid, branchId, deviceId, localStatus, deviceSequence',
+      completedOrders: 'id, branchId, createdAt, channel, tableNumber, livreurId',
+      syncCursors: 'id',
+      reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+      businessSettings: 'id',
+      floorTables: 'id, number, zone, status',
+      deliveryDrivers: 'id, number, status',
+      cashOpenings: 'id, branchId, dayKey',
+      ticketCounters: 'key',
+      posWsEvents: 'eventId, orderId, processedAt',
+      posWsState: 'id',
     });
   }
 }

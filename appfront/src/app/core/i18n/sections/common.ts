@@ -46,6 +46,10 @@ export const COMMON_FR: Record<string, string> = {
   'common.warning': 'Attention',
   'common.success': 'Succes',
   'common.understood': 'Compris',
+  'common.keyboard': 'Clavier',
+  'common.done': 'Terminer',
+  'common.space': 'Espace',
+  'common.shift': 'Maj',
 };
 
 export const COMMON_DE: Record<string, string> = {
@@ -96,4 +100,8 @@ export const COMMON_DE: Record<string, string> = {
   'common.warning': 'Achtung',
   'common.success': 'Erfolg',
   'common.understood': 'Verstanden',
+  'common.keyboard': 'Tastatur',
+  'common.done': 'Fertig',
+  'common.space': 'Leertaste',
+  'common.shift': 'Umschalt',
 };

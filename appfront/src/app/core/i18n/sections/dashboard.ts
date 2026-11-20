@@ -34,6 +34,11 @@ export const DASHBOARD_FR: Record<string, string> = {
   'dashboard.pinIncorrect': 'PIN incorrect. Reessayez.',
   'dashboard.invalidAmount': 'Montant invalide. Utilisez un nombre positif.',
   'dashboard.saveFailed': 'Enregistrement echoue.',
+  'dashboard.sections': 'Sections',
+  'dashboard.noSections': 'Aucune section a afficher.',
+  'dashboard.sectionName': 'Section',
+  'dashboard.sectionOrders': 'Commandes',
+  'dashboard.sectionRevenue': 'Recette',
 };
 
 export const DASHBOARD_DE: Record<string, string> = {
@@ -71,4 +76,9 @@ export const DASHBOARD_DE: Record<string, string> = {
   'dashboard.pinIncorrect': 'Falsche PIN. Bitte erneut versuchen.',
   'dashboard.invalidAmount': 'Ungültiger Betrag. Geben Sie eine positive Zahl ein.',
   'dashboard.saveFailed': 'Speichern fehlgeschlagen.',
+  'dashboard.sections': 'Bereiche',
+  'dashboard.noSections': 'Keine Bereiche anzuzeigen.',
+  'dashboard.sectionName': 'Bereich',
+  'dashboard.sectionOrders': 'Bestellungen',
+  'dashboard.sectionRevenue': 'Umsatz',
 };

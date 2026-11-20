@@ -1,7 +1,7 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { Subject, filter, takeUntil } from 'rxjs';
-import { CashOpening, DashboardSummary, SyncStatus } from '../../core/models/app.models';
+import { CashOpening, CompletedOrder, DashboardSummary, OrderChannel, SyncStatus } from '../../core/models/app.models';
 import { PosService } from '../../core/services/pos.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
@@ -91,6 +91,27 @@ const MANAGEMENT_PIN = '281998';
           <p>{{ lang.t('dashboard.lastSync') }}: {{ summary()?.lastSuccessfulSyncAt || lang.t('dashboard.pending') }}</p>
         </article>
       </div>
+
+      <article class="panel sections-panel">
+        <h2>{{ lang.t('dashboard.sections') }}</h2>
+        <p class="muted" *ngIf="sectionStats().length === 0">{{ lang.t('dashboard.noSections') }}</p>
+        <table class="sections-table" *ngIf="sectionStats().length > 0">
+          <thead>
+            <tr>
+              <th>{{ lang.t('dashboard.sectionName') }}</th>
+              <th>{{ lang.t('dashboard.sectionOrders') }}</th>
+              <th>{{ lang.t('dashboard.sectionRevenue') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let row of sectionStats()">
+              <td>{{ row.label }}</td>
+              <td>{{ row.orders }}</td>
+              <td>{{ row.revenue | number: '1.2-2' }} {{ displayCurrency() }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </article>
     </section>
 
     <!-- Fond de caisse modal -->
@@ -338,6 +359,37 @@ const MANAGEMENT_PIN = '281998';
         display: grid;
         grid-template-columns: 1.2fr 0.8fr;
         gap: 18px;
+      }
+
+      .sections-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 8px;
+        font-size: 13px;
+      }
+
+      .sections-table th,
+      .sections-table td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid var(--surface-border);
+      }
+
+      .sections-table th {
+        color: var(--muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-weight: 600;
+      }
+
+      .sections-table th:not(:first-child),
+      .sections-table td:not(:first-child) {
+        text-align: right;
+      }
+
+      .sections-table tbody tr:last-child td {
+        border-bottom: 0;
       }
 
       ul {
@@ -594,6 +646,9 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly cashOpening = signal<CashOpening | null>(null);
   protected readonly displayCurrency = signal<string>('DH');
 
+  /** Per-channel order count + collected revenue (section = order channel). */
+  protected readonly sectionStats = signal<Array<{ label: string; orders: number; revenue: number }>>([]);
+
   protected readonly cashModalOpen = signal(false);
   protected readonly cashPinAuthed = signal(false);
   protected readonly cashPinInputValue = signal('');
@@ -712,12 +767,13 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   }
 
   private async loadData(): Promise<void> {
-    const [summary, syncStatus, pendingQueueDepth, cashOpening, settings] = await Promise.all([
+    const [summary, syncStatus, pendingQueueDepth, cashOpening, settings, orders] = await Promise.all([
       this.workspaceService.loadDashboard(),
       this.workspaceService.loadSyncStatus(),
       this.posService.getPendingQueueDepth(),
       this.posService.getTodayCashOpening(),
       this.businessSettingsService.load().catch(() => null),
+      this.posService.listCompletedOrders(),
     ]);
 
     this.summary.set(summary);
@@ -725,5 +781,37 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.pendingQueueDepth.set(pendingQueueDepth);
     this.cashOpening.set(cashOpening);
     this.displayCurrency.set(settings?.currency?.trim() || cashOpening?.currency || 'DH');
+    this.sectionStats.set(
+      buildSectionStats(orders, {
+        SUR_PLACE: this.lang.t('orders.channelSurPlace'),
+        EMPORTER: this.lang.t('orders.channelEmporter'),
+        LIVRAISON: this.lang.t('orders.channelLivraison'),
+      }),
+    );
   }
+}
+
+/**
+ * Buckets completed orders per section. A section is the order channel
+ * (Sur place / A emporter / Livraison), so delivery and takeaway orders are
+ * counted too, not just table orders.
+ */
+function buildSectionStats(
+  orders: CompletedOrder[],
+  channelLabels: Record<OrderChannel, string>,
+): Array<{ label: string; orders: number; revenue: number }> {
+  const buckets = new Map<string, { orders: number; revenue: number }>();
+  for (const order of orders) {
+    const label = channelLabels[order.channel] ?? channelLabels.SUR_PLACE;
+    const bucket = buckets.get(label) ?? { orders: 0, revenue: 0 };
+    bucket.orders += 1;
+    if (order.status === 'PAID') {
+      bucket.revenue += order.total;
+    }
+    buckets.set(label, bucket);
+  }
+
+  return [...buckets.entries()]
+    .map(([label, bucket]) => ({ label, orders: bucket.orders, revenue: bucket.revenue }))
+    .sort((left, right) => left.label.localeCompare(right.label));
 }

@@ -16,7 +16,10 @@
           <p class="eyebrow" id="brand-label">Caisse mobile</p>
           <h1 id="brand-name">RoxPos</h1>
         </div>
-        <button type="button" class="ghost" id="reset-btn" hidden>Changer d'appareil</button>
+        <div class="topbar-actions">
+          <button type="button" class="ghost" id="orders-btn" hidden>Mes commandes</button>
+          <button type="button" class="ghost" id="reset-btn" hidden>Changer d'appareil</button>
+        </div>
       </header>
 
       <!-- Pairing -->
@@ -93,6 +96,18 @@
           <h2>Commande envoyee</h2>
           <p class="muted" id="done-detail"></p>
           <button type="button" class="primary" id="again-btn">Nouvelle commande</button>
+        </div>
+      </section>
+
+      <!-- My orders / personal stats -->
+      <section class="screen hidden" id="screen-orders">
+        <div class="stats-grid" id="stats-grid"></div>
+        <div class="card">
+          <h2>Mes commandes</h2>
+          <p class="muted">Les commandes envoyees depuis cet appareil.</p>
+          <div class="order-list" id="order-list"></div>
+          <p class="error" id="orders-error" hidden></p>
+          <button type="button" class="primary" id="orders-new-btn">Nouvelle commande</button>
         </div>
       </section>
 

@@ -78,6 +78,13 @@ a {
   text-decoration: none;
 }
 
+/* Active mouse "drag to scroll" gesture: show a grab cursor and block text selection. */
+body.drag-panning,
+body.drag-panning * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

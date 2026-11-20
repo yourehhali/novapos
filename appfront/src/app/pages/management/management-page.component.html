@@ -777,12 +777,28 @@
                 *ngIf="p.logoImageDataUrl"
                 class="logo-image-preview"
                 [src]="p.logoImageDataUrl"
+                [style.width.%]="p.logoScale"
                 [attr.alt]="lang.t('management.logoPaymentPreviewAlt')"
               />
               <div *ngIf="!p.logoImageDataUrl" class="logo-preview-empty">
                 {{ lang.t('management.noImagePayment') }}
               </div>
             </div>
+            <label class="logo-scale-row">
+              <span>{{ lang.t('management.logoSize') }}</span>
+              <div class="logo-scale-control">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  [style.--fill]="p.logoScale + '%'"
+                  [ngModel]="p.logoScale"
+                  (ngModelChange)="setTicketLayoutField('payment', 'logoScale', +$event)"
+                />
+                <span class="logo-scale-value">{{ p.logoScale }}%</span>
+              </div>
+            </label>
             <button
               type="button"
               class="secondary-button"
@@ -903,12 +919,28 @@
                 *ngIf="k.logoImageDataUrl"
                 class="logo-image-preview"
                 [src]="k.logoImageDataUrl"
+                [style.width.%]="k.logoScale"
                 [attr.alt]="lang.t('management.logoCuisinePreviewAlt')"
               />
               <div *ngIf="!k.logoImageDataUrl" class="logo-preview-empty">
                 {{ lang.t('management.noImageKitchen') }}
               </div>
             </div>
+            <label class="logo-scale-row">
+              <span>{{ lang.t('management.logoSize') }}</span>
+              <div class="logo-scale-control">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="5"
+                  [style.--fill]="k.logoScale + '%'"
+                  [ngModel]="k.logoScale"
+                  (ngModelChange)="setTicketLayoutField('kitchen', 'logoScale', +$event)"
+                />
+                <span class="logo-scale-value">{{ k.logoScale }}%</span>
+              </div>
+            </label>
             <button
               type="button"
               class="secondary-button"

@@ -17,6 +17,13 @@ import {
 import { SessionService } from './session.service';
 import { LanguageService } from '../i18n/language.service';
 
+/** Machine-readable reasons an external order can be rejected outright. */
+export type ExternalOrderRejectionCode =
+  | 'session_unavailable'
+  | 'empty_order'
+  | 'unknown_product'
+  | 'product_unavailable';
+
 function dayKeyFor(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -181,6 +188,40 @@ export class PosService {
     return record;
   }
 
+  /**
+   * Atomically reads and increments a durable ticket counter stored in
+   * IndexedDB. Counters survive restarts so ticket numbers stay unique.
+   */
+  private async nextTicketCounter(key: string): Promise<number> {
+    return this.db.transaction('rw', this.db.ticketCounters, async () => {
+      const existing = await this.db.ticketCounters.get(key);
+      const next = (existing?.value ?? 0) + 1;
+      await this.db.ticketCounters.put({ key, value: next });
+      return next;
+    });
+  }
+
+  /**
+   * Builds the human ticket number:
+   *  - Table orders: T{TT}-{NNN} with an independent counter per table.
+   *  - Delivery orders: W{NNNNN} with a single global counter.
+   *  - Takeaway orders: E{NNNNN} with a single global counter.
+   */
+  async nextOrderNumber(channel: OrderChannel, tableNumber?: string): Promise<string> {
+    if (channel === 'SUR_PLACE') {
+      const digits = (tableNumber ?? '').replace(/\D/g, '');
+      const tableCode = (digits || (tableNumber ?? '').trim() || '0').padStart(2, '0');
+      const sequence = await this.nextTicketCounter(`T${tableCode}`);
+      return `T${tableCode}-${String(sequence).padStart(3, '0')}`;
+    }
+    if (channel === 'LIVRAISON') {
+      const sequence = await this.nextTicketCounter('W');
+      return `W${String(sequence).padStart(5, '0')}`;
+    }
+    const sequence = await this.nextTicketCounter('E');
+    return `E${String(sequence).padStart(5, '0')}`;
+  }
+
   async prepareOrder(): Promise<CompletedOrder | null> {
     const branch = this.session.branch();
     const user = this.session.user();
@@ -259,9 +300,11 @@ export class PosService {
 
     const orderId = crypto.randomUUID();
     const channel = this.channel();
+    const tableNumber = channel === 'SUR_PLACE' ? this.selectedTableNumber() || undefined : undefined;
+    const orderNumber = await this.nextOrderNumber(channel, tableNumber);
     const order: CompletedOrder = {
       id: orderId,
-      orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
+      orderNumber,
       branchId: branch.branchId,
       cashierName: user.displayName,
       total,
@@ -269,7 +312,7 @@ export class PosService {
       paymentMethod: 'UNPAID',
       status: 'PREPARED',
       channel,
-      tableNumber: channel === 'SUR_PLACE' ? this.selectedTableNumber() || undefined : undefined,
+      tableNumber,
       livreurId: channel === 'LIVRAISON' ? this.selectedLivreurId() || undefined : undefined,
       deliveryAddress: channel === 'LIVRAISON' ? this.deliveryAddress() || undefined : undefined,
       customerPhone: this.customerPhone() || undefined,
@@ -321,11 +364,69 @@ export class PosService {
   }
 
   /**
+   * Strict, read-only validation of an externally submitted order. Unlike
+   * `createExternalOrder` (which tolerates partial data for the pocket flow),
+   * this reports every unknown/unavailable product so callers such as the
+   * website integration can reject the whole order instead of dropping lines.
+   */
+  async inspectExternalOrder(request: PocketIncomingOrder): Promise<
+    | { ok: true }
+    | { ok: false; code: ExternalOrderRejectionCode; message: string; productIds: string[] }
+  > {
+    if (!this.session.branch() || !this.session.user()) {
+      return {
+        ok: false,
+        code: 'session_unavailable',
+        message: this.lang.t('services.noActiveSession'),
+        productIds: [],
+      };
+    }
+
+    if (request.lines.length === 0) {
+      return { ok: false, code: 'empty_order', message: 'La commande est vide.', productIds: [] };
+    }
+
+    const products = await this.db.products.toArray();
+    const productMap = new Map(products.map((product) => [product.id, product]));
+    const unknown: string[] = [];
+    const unavailable: string[] = [];
+
+    for (const entry of request.lines) {
+      const product = productMap.get(entry.productId);
+      if (!product) {
+        unknown.push(entry.productId);
+      } else if (product.available === false) {
+        unavailable.push(entry.productId);
+      }
+    }
+
+    if (unknown.length > 0 || unavailable.length > 0) {
+      return {
+        ok: false,
+        code: unknown.length > 0 ? 'unknown_product' : 'product_unavailable',
+        message: unknown.length > 0
+          ? `${unknown.length} produit(s) inconnu(s) dans le catalogue.`
+          : `${unavailable.length} produit(s) indisponible(s).`,
+        productIds: [...unknown, ...unavailable],
+      };
+    }
+
+    return { ok: true };
+  }
+
+  /**
    * Builds a PREPARED order from an order pushed by a paired pocket device.
    * Mirrors prepareOrder() but sources its lines/channel from the request
    * instead of the local cart, so the desktop keeps handling printing/payment.
+   *
+   * When `options.dedupe` is provided the website event -> order mapping is
+   * written in the same transaction as the order, so a retried event can never
+   * produce a second order.
    */
-  async createExternalOrder(request: PocketIncomingOrder): Promise<CompletedOrder | null> {
+  async createExternalOrder(
+    request: PocketIncomingOrder,
+    options: { dedupe?: { eventId: string; source: string } } = {},
+  ): Promise<CompletedOrder | null> {
     const branch = this.session.branch();
     const user = this.session.user();
     if (!branch || !user) {
@@ -358,9 +459,11 @@ export class PosService {
     const now = new Date().toISOString();
     const orderId = crypto.randomUUID();
     const channel = request.channel;
+    const tableNumber = channel === 'SUR_PLACE' ? request.tableNumber : undefined;
+    const orderNumber = await this.nextOrderNumber(channel, tableNumber);
     const order: CompletedOrder = {
       id: orderId,
-      orderNumber: `ORD-${Date.now().toString().slice(-6)}`,
+      orderNumber,
       branchId: branch.branchId,
       cashierName: request.deviceLabel?.trim() || user.displayName,
       total,
@@ -368,7 +471,7 @@ export class PosService {
       paymentMethod: 'UNPAID',
       status: 'PREPARED',
       channel,
-      tableNumber: channel === 'SUR_PLACE' ? request.tableNumber : undefined,
+      tableNumber,
       livreurId: channel === 'LIVRAISON' ? request.livreurId : undefined,
       deliveryAddress: channel === 'LIVRAISON' ? request.deliveryAddress : undefined,
       customerPhone: request.customerPhone,
@@ -378,6 +481,8 @@ export class PosService {
       kitchenPrintedAt: now,
       lastUpdatedAt: now,
       version: 2,
+      deviceId: request.deviceId,
+      deviceLabel: request.deviceLabel,
     };
 
     const orderCreated = this.createOrderEvent(
@@ -409,9 +514,25 @@ export class PosService {
       Date.now() + 1,
     );
 
-    await this.db.transaction('rw', this.db.completedOrders, this.db.eventQueue, async () => {
+    const dedupe = options.dedupe;
+    const tables = dedupe
+      ? [this.db.completedOrders, this.db.eventQueue, this.db.posWsEvents]
+      : [this.db.completedOrders, this.db.eventQueue];
+
+    await this.db.transaction('rw', tables, async () => {
       await this.db.completedOrders.put(order);
       await this.db.eventQueue.bulkPut([orderCreated, kitchenTicketPrinted]);
+      if (dedupe) {
+        await this.db.posWsEvents.put({
+          eventId: dedupe.eventId,
+          orderId,
+          orderNumber: order.orderNumber,
+          total,
+          channel,
+          source: dedupe.source,
+          processedAt: now,
+        });
+      }
     });
 
     this.lastOrder.set(order);

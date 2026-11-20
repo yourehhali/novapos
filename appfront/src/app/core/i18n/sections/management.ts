@@ -101,6 +101,7 @@ export const MANAGEMENT_FR: Record<string, string> = {
   'management.chooseImage': 'Choisir une image (PNG/JPG, max 1.5 Mo)',
   'management.noImageSelected': 'Aucune image selectionnee',
   'management.removeImage': 'Supprimer l image',
+  'management.logoSize': 'Taille du logo',
 
   // Per-kind ticket layouts
   'management.ticketLayout': 'Mise en page par type de ticket',
@@ -302,6 +303,7 @@ export const MANAGEMENT_DE: Record<string, string> = {
   'management.chooseImage': 'Bild auswählen (PNG/JPG, max. 1,5 MB)',
   'management.noImageSelected': 'Kein Bild ausgewählt',
   'management.removeImage': 'Bild entfernen',
+  'management.logoSize': 'Logogröße',
 
   // Per-kind ticket layouts
   'management.ticketLayout': 'Layout pro Tickettyp',
