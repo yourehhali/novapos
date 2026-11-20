@@ -10,10 +10,9 @@ import { LanguageService } from '../../../core/i18n/language.service';
 import { DesktopBridgeService } from '../../../core/services/desktop-bridge.service';
 import { WebsocketPosService } from '../../../core/services/websocket-pos.service';
 
-const TRANSPORT_LOG_LIMIT = 100;
-const LOG_VIEW_LIMIT = 40;
+const TRANSPORT_LOG_LIMIT = 50;
+const LOG_VIEW_LIMIT = 20;
 
-/** Maps a connection state to its i18n key suffix. */
 function stateKey(state: PosWsConnectionState | undefined): string {
   switch (state) {
     case 'CONNECTED':
@@ -29,11 +28,6 @@ function stateKey(state: PosWsConnectionState | undefined): string {
   }
 }
 
-/**
- * Settings panel for the almani-nafris.com integration. Shows the live
- * connection state, lets the operator edit the endpoint/token and exposes the
- * integration logs. The transport itself runs in the Electron main process.
- */
 @Component({
   selector: 'app-pos-ws-panel',
   templateUrl: './pos-ws-panel.component.html',
@@ -74,7 +68,11 @@ export class PosWsPanelComponent implements OnInit, OnDestroy {
     );
 
     await this.refreshConfig();
-    this.transportLogs.set(await this.ws.getTransportLogs());
+    // `getTransportLogs()` returns the main-process buffer oldest-first.
+    // Reverse it so newest entries are on top, then keep only the recent window
+    // so old log lines are replaced by new ones instead of stacking up forever.
+    const history = await this.ws.getTransportLogs();
+    this.transportLogs.set([...history].reverse().slice(0, TRANSPORT_LOG_LIMIT));
   }
 
   ngOnDestroy(): void {
