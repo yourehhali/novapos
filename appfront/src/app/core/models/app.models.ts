@@ -177,6 +177,12 @@ export interface CompletedOrder {
   paidAt?: string;
   lastUpdatedAt: string;
   version: number;
+  /** VAT rate already included in the prices (0.10 dine-in, 0.20 takeaway/delivery). */
+  vatRate: number;
+  /** VAT amount extracted out of `total` (prices are VAT-inclusive). */
+  vatAmount: number;
+  /** Net amount excluding VAT: `total - vatAmount`. */
+  netTotal: number;
   /** Identifier of the pocket device that pushed the order (used for per-device stats). */
   deviceId?: string;
   /** Human label of the pocket device that pushed the order. */

@@ -24,6 +24,35 @@ export type ExternalOrderRejectionCode =
   | 'unknown_product'
   | 'product_unavailable';
 
+/** VAT rates already included in the catalog prices, per sales channel. */
+const VAT_RATE_BY_CHANNEL: Record<OrderChannel, number> = {
+  SUR_PLACE: 0.1,
+  EMPORTER: 0.2,
+  LIVRAISON: 0.2,
+};
+
+export interface OrderVatBreakdown {
+  vatRate: number;
+  vatAmount: number;
+  netTotal: number;
+}
+
+function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Prices are VAT-inclusive, so the VAT is extracted out of the gross total
+ * rather than added to it. The net amount is rounded first and the VAT is the
+ * remainder, which guarantees `netTotal + vatAmount === grossTotal`.
+ */
+export function extractOrderVat(channel: OrderChannel, grossTotal: number): OrderVatBreakdown {
+  const vatRate = VAT_RATE_BY_CHANNEL[channel];
+  const netTotal = round2(grossTotal / (1 + vatRate));
+  const vatAmount = round2(grossTotal - netTotal);
+  return { vatRate, vatAmount, netTotal };
+}
+
 function dayKeyFor(date: Date): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -255,6 +284,7 @@ export class PosService {
         livreurId: this.channel() === 'LIVRAISON' ? this.selectedLivreurId() || undefined : undefined,
         deliveryAddress: this.channel() === 'LIVRAISON' ? this.deliveryAddress() || undefined : undefined,
         customerPhone: this.customerPhone() || undefined,
+        ...extractOrderVat(this.channel(), total),
       };
 
       const orderEdited = this.createOrderEvent(
@@ -322,6 +352,7 @@ export class PosService {
       kitchenPrintedAt: now,
       lastUpdatedAt: now,
       version: 2,
+      ...extractOrderVat(channel, total),
     };
 
     const orderCreated = this.createOrderEvent(
@@ -481,6 +512,7 @@ export class PosService {
       kitchenPrintedAt: now,
       lastUpdatedAt: now,
       version: 2,
+      ...extractOrderVat(channel, total),
       deviceId: request.deviceId,
       deviceLabel: request.deviceLabel,
     };
@@ -682,6 +714,7 @@ export class PosService {
       kitchenPrintedAt: order.kitchenPrintedAt ?? createdAt,
       lastUpdatedAt,
       version: order.version ?? (status === 'PAID' ? 3 : 2),
+      ...extractOrderVat(channel, order.total),
     };
   }
 }

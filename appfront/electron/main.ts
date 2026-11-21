@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { writeFile, unlink } from 'node:fs/promises';
+import { open, writeFile, unlink, type FileHandle } from 'node:fs/promises';
 import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
@@ -183,6 +183,12 @@ interface TicketOrder {
   livreurId?: string;
   customerPhone?: string;
   deliveryAddress?: string;
+  /** VAT rate included in the prices (0.10 dine-in, 0.20 takeaway/delivery). */
+  vatRate?: number;
+  /** VAT amount extracted out of `total`. */
+  vatAmount?: number;
+  /** Net amount excluding VAT. */
+  netTotal?: number;
 }
 
 interface PrintTicketRequest {
@@ -814,6 +820,16 @@ async function sendToSystemPrinterQueue(
   destination: Extract<RawPrinterDestination, { type: 'queue' }>,
   payload: Buffer,
 ): Promise<void> {
+  // Windows: writing straight to the printer port (e.g. \\.\USB001) bypasses
+  // PowerShell and the spooler, which is what made USB printers take seconds
+  // per ticket. Falls back to the spooler when the port is not writable.
+  if (process.platform === 'win32') {
+    const portName = await resolveWindowsPrinterPort(destination.queueName);
+    if (portName && (await tryWriteWindowsPrinterPort(portName, payload))) {
+      return;
+    }
+  }
+
   const tempFilePath = path.join(
     os.tmpdir(),
     `RoxPos-escpos-${Date.now()}-${Math.random().toString(36).slice(2)}.bin`,
@@ -840,6 +856,55 @@ async function sendToSystemPrinterQueue(
     throw new Error('Neither lp nor lpr is available to send RAW ESC/POS data to the printer queue.');
   } finally {
     await unlink(tempFilePath).catch(() => undefined);
+  }
+}
+
+/** Cached spooler port per Windows printer; resolved once per app run. */
+const windowsPrinterPortCache = new Map<string, string | null>();
+
+/**
+ * Resolves the spooler port backing a Windows printer (e.g. "USB001"). The
+ * lookup shells out to Get-Printer, so the result is cached for the process
+ * lifetime and never resolved per ticket.
+ */
+async function resolveWindowsPrinterPort(printerName: string): Promise<string | null> {
+  const cached = windowsPrinterPortCache.get(printerName);
+  if (cached !== undefined) {
+    return cached;
+  }
+
+  let portName: string | null = null;
+  try {
+    const script = `(Get-Printer -Name '${escapePowerShellLiteral(printerName)}' -ErrorAction Stop).PortName`;
+    const { stdout } = await execFileAsync(
+      'powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script],
+      { windowsHide: true },
+    );
+    portName = String(stdout).trim() || null;
+  } catch {
+    portName = null;
+  }
+
+  windowsPrinterPortCache.set(printerName, portName);
+  return portName;
+}
+
+/**
+ * Writes ESC/POS bytes directly to a Windows printer port. Returns false when
+ * the port cannot be opened for writing (locked by the driver, not a raw port,
+ * ...) so the caller can fall back to the printing spooler.
+ */
+async function tryWriteWindowsPrinterPort(portName: string, payload: Buffer): Promise<boolean> {
+  let handle: FileHandle | null = null;
+  try {
+    handle = await open(`\\\\.\\${portName}`, 'r+');
+    await handle.write(payload);
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await handle?.close().catch(() => undefined);
   }
 }
 
@@ -1007,8 +1072,11 @@ function buildTicketEscPosPayload(request: PrintTicketRequest): Buffer {
     }
     chunks.push(textLine('-'.repeat(width)));
     chunks.push(bold(true));
-    chunks.push(textLine(twoColumnLine('TOTAL', formatMoney(request.order.total, request.order.currency), width)));
+    chunks.push(textLine(twoColumnLine('TOTAL TTC', formatMoney(request.order.total, request.order.currency), width)));
     chunks.push(bold(false));
+    for (const row of paymentVatRows(request.order)) {
+      chunks.push(textLine(twoColumnLine(row.label, row.value, width)));
+    }
     chunks.push(textLine(twoColumnLine('PAIEMENT', sanitizeForEscPos(formatPaymentMethod(request.order.paymentMethod).toUpperCase()), width)));
     chunks.push(openDrawerPulse());
   } else {
@@ -1533,7 +1601,7 @@ function estimateTicketHeightMm(request: PrintTicketRequest): number {
     const normalizedLength = line.name.trim().length || 1;
     return total + Math.max(1, Math.ceil(normalizedLength / itemChars));
   }, 0);
-  const headerLines = request.kind === 'KITCHEN' ? 4 : 5;
+  const headerLines = request.kind === 'KITCHEN' ? 4 : 7;
   const footerLines = request.kind === 'KITCHEN' ? 1 : 2;
   const totalTextLines = headerLines + footerLines + wrappedLineCount;
   const heightMm = paperWidthMm <= 58
@@ -1586,14 +1654,29 @@ function buildTicketHtml(request: PrintTicketRequest): string {
     })
     .join('');
 
+  const vatRows =
+    request.kind === 'PAYMENT'
+      ? paymentVatRows(request.order)
+          .map(
+            (row) => `
+        <div class="summary-row meta-row">
+          <span>${escapeHtml(row.label)}</span>
+          <span>${escapeHtml(row.value)}</span>
+        </div>
+      `,
+          )
+          .join('')
+      : '';
+
   const totalBlock =
     request.kind === 'PAYMENT'
       ? `
         <div class="divider"></div>
         <div class="summary-row">
-          <span>Total</span>
+          <span>Total TTC</span>
           <strong>${formatMoney(request.order.total, request.order.currency)}</strong>
         </div>
+        ${vatRows}
         <div class="summary-row meta-row">
           <span>Paiement</span>
           <span>${formatPaymentMethod(request.order.paymentMethod)}</span>
@@ -1955,6 +2038,30 @@ function formatPaymentMethod(paymentMethod: string): string {
     return 'Especes';
   }
   return 'Non paye';
+}
+
+function formatVatRate(rate: number): string {
+  return `${Math.round(rate * 1000) / 10}%`;
+}
+
+/**
+ * VAT breakdown rows for the payment ticket. Prices are VAT-inclusive, so the
+ * total stays the amount actually paid and the VAT is shown as extracted from
+ * it (TTC -> TVA -> HT). Returns an empty list when the order carries no VAT
+ * detail (e.g. orders recorded before VAT support).
+ */
+function paymentVatRows(order: TicketOrder): { label: string; value: string }[] {
+  if (
+    typeof order.vatRate !== 'number' ||
+    typeof order.vatAmount !== 'number' ||
+    typeof order.netTotal !== 'number'
+  ) {
+    return [];
+  }
+  return [
+    { label: `TVA ${formatVatRate(order.vatRate)}`, value: formatMoney(order.vatAmount, order.currency) },
+    { label: 'TOTAL HT', value: formatMoney(order.netTotal, order.currency) },
+  ];
 }
 
 function escapeHtml(value: string): string {
