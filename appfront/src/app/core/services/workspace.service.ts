@@ -37,11 +37,14 @@ export class WorkspaceService {
   private readonly tablesChangedSource = new Subject<void>();
   private readonly driversChangedSource = new Subject<void>();
   private readonly businessSettingsChangedSource = new Subject<void>();
+  private readonly ordersChangedSource = new Subject<void>();
 
   readonly catalogChanged$ = this.catalogChangedSource.asObservable();
   readonly tablesChanged$ = this.tablesChangedSource.asObservable();
   readonly driversChanged$ = this.driversChangedSource.asObservable();
   readonly businessSettingsChanged$ = this.businessSettingsChangedSource.asObservable();
+  /** Emitted whenever a completed order is created, edited or paid. */
+  readonly ordersChanged$ = this.ordersChangedSource.asObservable();
 
   invalidateAllCaches(): void {
     this.catalogCache = null;
@@ -62,6 +65,10 @@ export class WorkspaceService {
 
   emitBusinessSettingsChanged(): void {
     this.businessSettingsChangedSource.next();
+  }
+
+  emitOrdersChanged(): void {
+    this.ordersChangedSource.next();
   }
 
   invalidateAllCachesAndEmit(kind: 'catalog' | 'tables' | 'drivers' | 'settings' | 'all' = 'all'): void {

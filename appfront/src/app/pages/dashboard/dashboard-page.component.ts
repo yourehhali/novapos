@@ -702,6 +702,11 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.workspaceService.businessSettingsChanged$
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => void this.loadData());
+    // Recompute the day's figures straight from the order store so the
+    // dashboard stays live while it is open (new orders, payments, edits).
+    this.workspaceService.ordersChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => void this.loadData());
   }
 
   ngOnDestroy(): void {

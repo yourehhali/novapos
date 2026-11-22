@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, nativeImage, screen, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, nativeImage, powerMonitor, screen, shell } from 'electron';
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { open, writeFile, unlink, type FileHandle } from 'node:fs/promises';
@@ -210,6 +210,15 @@ interface SalesSummaryEntry {
   currency: string;
 }
 
+interface SalesSummaryVatLine {
+  channel: 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON';
+  vatRate: number;
+  orderCount: number;
+  grossTotal: number;
+  netTotal: number;
+  vatAmount: number;
+}
+
 interface SalesSummaryReport {
   range: 'DAY_START' | 'LAST_REPORT';
   branchId: string;
@@ -219,8 +228,11 @@ interface SalesSummaryReport {
   toAt: string;
   orderCount: number;
   grandTotal: number;
+  totalNet: number;
+  totalVat: number;
   currency: string;
   entries: SalesSummaryEntry[];
+  vatBreakdown: SalesSummaryVatLine[];
 }
 
 interface PrintSalesSummaryRequest {
@@ -298,6 +310,25 @@ function resolveDisplayScale(): number {
   }
 }
 
+/**
+ * Re-asserts the renderer scale. Chromium drops the zoom applied through
+ * setZoomFactor when the page is recreated (reload, sleep/wake, GPU reset) or
+ * when the page is repainted after being covered, so it is re-applied on every
+ * event that can lose it. Cheap no-op when the scale is already correct.
+ */
+function applyDisplayScale(window: BrowserWindow): void {
+  if (window.isDestroyed() || window.webContents.isDestroyed()) {
+    return;
+  }
+
+  const scale = resolveDisplayScale();
+  if (Math.abs(window.webContents.getZoomFactor() - scale) < 0.001) {
+    return;
+  }
+
+  window.webContents.setZoomFactor(scale);
+}
+
 function createMainWindow(): BrowserWindow {
   const appIcon = getAppIcon();
   const isDevelopment = Boolean(process.env['RoxPos_RENDERER_URL']);
@@ -315,12 +346,20 @@ function createMainWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      // Read at page creation, so the scale survives reloads and renderer
+      // restarts that a one-shot setZoomFactor would not.
+      zoomFactor: resolveDisplayScale(),
     },
   });
 
-  window.webContents.on('did-finish-load', () => {
-    window.webContents.setZoomFactor(resolveDisplayScale());
-  });
+  // Chromium drops the zoom when the page is recreated or repainted after being
+  // covered, so re-assert it on load, navigation, restore and focus.
+  window.webContents.on('did-finish-load', () => applyDisplayScale(window));
+  window.webContents.on('did-navigate', () => applyDisplayScale(window));
+  window.webContents.on('did-navigate-in-page', () => applyDisplayScale(window));
+  window.on('show', () => applyDisplayScale(window));
+  window.on('restore', () => applyDisplayScale(window));
+  window.on('focus', () => applyDisplayScale(window));
 
   const rendererUrl = process.env['RoxPos_RENDERER_URL'];
   const rendererIndex = path.join(app.getAppPath(), 'dist', 'appfront', 'browser', 'index.html');
@@ -1139,11 +1178,32 @@ function buildSalesSummaryEscPosPayload(request: PrintSalesSummaryRequest): Buff
     }
   }
 
+  if (request.report.vatBreakdown.length > 0) {
+    chunks.push(textLine('-'.repeat(width)));
+    chunks.push(textLine('TVA PAR TYPE DE COMMANDE'));
+    for (const line of request.report.vatBreakdown) {
+      chunks.push(
+        textLine(
+          formatColumns(
+            [summaryChannelLabel(line.channel), formatVatRate(line.vatRate), `COM: ${line.orderCount}`],
+            [Math.max(12, width - 16), 6, 8],
+            ['left', 'left', 'right'],
+          ),
+        ),
+      );
+      chunks.push(textLine(twoColumnLine('  TTC', formatMoney(line.grossTotal, request.report.currency), width)));
+      chunks.push(textLine(twoColumnLine('  HT', formatMoney(line.netTotal, request.report.currency), width)));
+      chunks.push(textLine(twoColumnLine('  TVA', formatMoney(line.vatAmount, request.report.currency), width)));
+    }
+  }
+
   chunks.push(textLine('-'.repeat(width)));
   chunks.push(textLine(twoColumnLine('TOTAL COMMANDES', String(request.report.orderCount), width)));
   chunks.push(bold(true));
-  chunks.push(textLine(twoColumnLine('TOTAL CUMULE', formatMoney(request.report.grandTotal, request.report.currency), width)));
+  chunks.push(textLine(twoColumnLine('TOTAL TTC', formatMoney(request.report.grandTotal, request.report.currency), width)));
   chunks.push(bold(false));
+  chunks.push(textLine(twoColumnLine('TOTAL HT', formatMoney(request.report.totalNet, request.report.currency), width)));
+  chunks.push(textLine(twoColumnLine('TOTAL TVA', formatMoney(request.report.totalVat, request.report.currency), width)));
 
   const summaryFooterLines = buildFooterEscPos(request.settings, 'payment', width);
   if (summaryFooterLines.length > 0) {
@@ -2044,6 +2104,16 @@ function formatVatRate(rate: number): string {
   return `${Math.round(rate * 1000) / 10}%`;
 }
 
+function summaryChannelLabel(channel: 'SUR_PLACE' | 'EMPORTER' | 'LIVRAISON'): string {
+  if (channel === 'EMPORTER') {
+    return 'A EMPORTER';
+  }
+  if (channel === 'LIVRAISON') {
+    return 'LIVRAISON';
+  }
+  return 'SUR PLACE';
+}
+
 /**
  * VAT breakdown rows for the payment ticket. Prices are VAT-inclusive, so the
  * total stays the amount actually paid and the VAT is shown as extracted from
@@ -2088,6 +2158,18 @@ app.whenReady().then(() => {
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       mainWindow = createMainWindow();
+    }
+  });
+
+  // Waking from sleep and resolution/DPI changes both reset the renderer zoom.
+  powerMonitor.on('resume', () => {
+    if (mainWindow) {
+      applyDisplayScale(mainWindow);
+    }
+  });
+  screen.on('display-metrics-changed', () => {
+    if (mainWindow) {
+      applyDisplayScale(mainWindow);
     }
   });
 });

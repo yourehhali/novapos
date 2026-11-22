@@ -16,6 +16,7 @@ import {
 } from '../models/app.models';
 import { SessionService } from './session.service';
 import { LanguageService } from '../i18n/language.service';
+import { WorkspaceService } from './workspace.service';
 
 /** Machine-readable reasons an external order can be rejected outright. */
 export type ExternalOrderRejectionCode =
@@ -65,6 +66,7 @@ export class PosService {
   private readonly db = inject(RoxPosDbService);
   private readonly session = inject(SessionService);
   private readonly router = inject(Router);
+  private readonly workspace = inject(WorkspaceService);
   protected readonly lang = inject(LanguageService);
 
   readonly cart = signal<PosLine[]>([]);
@@ -324,6 +326,7 @@ export class PosService {
       this.lastOrder.set(updatedOrder);
       this.cart.set([]);
       this.editingPreparedOrderId.set(null);
+      this.workspace.emitOrdersChanged();
 
       return updatedOrder;
     }
@@ -390,6 +393,7 @@ export class PosService {
 
     this.lastOrder.set(order);
     this.cart.set([]);
+    this.workspace.emitOrdersChanged();
 
     return order;
   }
@@ -568,6 +572,7 @@ export class PosService {
     });
 
     this.lastOrder.set(order);
+    this.workspace.emitOrdersChanged();
     return order;
   }
 
@@ -610,6 +615,7 @@ export class PosService {
     });
 
     this.lastOrder.set(updatedOrder);
+    this.workspace.emitOrdersChanged();
     return updatedOrder;
   }
 

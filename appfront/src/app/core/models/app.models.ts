@@ -214,6 +214,21 @@ export interface SalesSummaryEntry {
   currency: string;
 }
 
+/**
+ * VAT totals for one sales channel. Prices are VAT-inclusive, so `grossTotal`
+ * is what was collected, `netTotal` excludes VAT and `vatAmount` is the VAT
+ * extracted from it. The rate depends on the channel (10% dine-in, 20%
+ * takeaway/delivery).
+ */
+export interface SalesSummaryVatLine {
+  channel: OrderChannel;
+  vatRate: number;
+  orderCount: number;
+  grossTotal: number;
+  netTotal: number;
+  vatAmount: number;
+}
+
 export interface SalesSummaryReport {
   range: SalesSummaryRange;
   branchId: string;
@@ -223,8 +238,14 @@ export interface SalesSummaryReport {
   toAt: string;
   orderCount: number;
   grandTotal: number;
+  /** Sum of the VAT-excluded bases. */
+  totalNet: number;
+  /** Sum of the extracted VAT. */
+  totalVat: number;
   currency: string;
   entries: SalesSummaryEntry[];
+  /** VAT detail per sales channel, in channel order. */
+  vatBreakdown: SalesSummaryVatLine[];
 }
 
 export interface ReportPrintState {
