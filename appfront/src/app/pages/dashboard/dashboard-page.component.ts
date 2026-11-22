@@ -5,6 +5,8 @@ import { CashOpening, CompletedOrder, DashboardSummary, OrderChannel, SyncStatus
 import { PosService } from '../../core/services/pos.service';
 import { WorkspaceService } from '../../core/services/workspace.service';
 import { BusinessSettingsService } from '../../core/services/business-settings.service';
+import { SalesSummaryService } from '../../core/services/sales-summary.service';
+import { ReceiptService } from '../../core/services/receipt.service';
 import { LanguageService } from '../../core/i18n/language.service';
 
 const MANAGEMENT_PIN = '281998';
@@ -17,8 +19,29 @@ const MANAGEMENT_PIN = '281998';
         <div>
           <p class="eyebrow">{{ lang.t('dashboard.eyebrow') }}</p>
           <h1>{{ lang.t('dashboard.title') }}</h1>
+          <span class="day-status" [class.locked]="dayLocked()">{{ dayStatusLabel() }}</span>
+        </div>
+        <div class="day-actions">
+          <button
+            type="button"
+            class="secondary-button"
+            [disabled]="dayBusy()"
+            (click)="startDay()"
+          >
+            {{ lang.t('dashboard.startDay') }}
+          </button>
+          <button
+            type="button"
+            class="primary-button"
+            [disabled]="dayBusy()"
+            (click)="endDay()"
+          >
+            {{ dayBusy() ? lang.t('dashboard.dayWorking') : lang.t('dashboard.endDay') }}
+          </button>
         </div>
       </header>
+
+      <p class="day-error" *ngIf="dayError()">{{ dayError() }}</p>
 
       <div class="metrics metrics-four">
         <article class="metric-card">
@@ -199,9 +222,51 @@ const MANAGEMENT_PIN = '281998';
         gap: 18px;
       }
 
+      .page-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 14px;
+      }
+
       .page-header h1 {
         margin-top: 6px;
         font-size: 30px;
+      }
+
+      .day-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .day-status {
+        display: inline-block;
+        margin-top: 10px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        border: 1px solid color-mix(in srgb, var(--success) 32%, transparent);
+        background: color-mix(in srgb, var(--success) 10%, transparent);
+        color: var(--success);
+        font-size: 11px;
+        font-weight: 600;
+      }
+
+      .day-status.locked {
+        border-color: var(--surface-border);
+        background: var(--surface-raised);
+        color: var(--muted);
+      }
+
+      .day-error {
+        margin: 0;
+        padding: 8px 10px;
+        border-radius: var(--radius-sm);
+        border: 1px solid color-mix(in srgb, var(--danger) 26%, transparent);
+        background: color-mix(in srgb, var(--danger) 10%, transparent);
+        color: var(--danger);
+        font-size: 12px;
+        font-weight: 500;
       }
 
       .eyebrow {
@@ -637,6 +702,8 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   private readonly workspaceService = inject(WorkspaceService);
   private readonly posService = inject(PosService);
   private readonly businessSettingsService = inject(BusinessSettingsService);
+  private readonly salesSummaryService = inject(SalesSummaryService);
+  private readonly receiptService = inject(ReceiptService);
   private readonly router = inject(Router);
 
   protected readonly summary = signal<DashboardSummary | null>(null);
@@ -657,6 +724,24 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
   protected readonly cashNoteInput = signal('');
   protected readonly cashSaveError = signal<string | null>(null);
   protected readonly cashSaving = signal(false);
+
+  protected readonly dayBusy = signal(false);
+  protected readonly dayError = signal<string | null>(null);
+  protected readonly dayLocked = this.workspaceService.dayLocked;
+
+  protected readonly dayStatusLabel = computed(() => {
+    const session = this.workspaceService.daySession();
+    if (!session) {
+      return this.lang.t('dashboard.dayNotStarted');
+    }
+
+    const time = (iso: string) =>
+      new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+    return session.closedAt
+      ? this.lang.t('dashboard.dayClosedAt', { time: time(session.closedAt) })
+      : this.lang.t('dashboard.dayOpenSince', { time: time(session.startedAt) });
+  });
 
   protected readonly expectedCashDrawer = computed(() => {
     const opening = this.cashOpening();
@@ -745,6 +830,53 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     }
   }
 
+  /**
+   * Opens a new business day: the dashboard drops the previous day's orders
+   * and totals, and order creation is unlocked again.
+   */
+  protected async startDay(): Promise<void> {
+    this.dayBusy.set(true);
+    this.dayError.set(null);
+
+    try {
+      await this.workspaceService.startDay();
+      await this.loadData();
+    } catch (error) {
+      this.dayError.set(error instanceof Error ? error.message : this.lang.t('dashboard.dayActionFailed'));
+    } finally {
+      this.dayBusy.set(false);
+    }
+  }
+
+  /**
+   * Prints the daily ticket (full day, with the per-order-type VAT breakdown)
+   * then closes the day so no further order can be recorded until the next
+   * start. A printing failure is reported but does not keep the day open.
+   */
+  protected async endDay(): Promise<void> {
+    this.dayBusy.set(true);
+    this.dayError.set(null);
+
+    try {
+      const report = await this.salesSummaryService.buildReport('DAY_START');
+      if (report) {
+        const printed = await this.receiptService.printSalesSummary(report);
+        if (printed) {
+          await this.salesSummaryService.markPrinted(report);
+        } else {
+          this.dayError.set(this.lang.t('dashboard.dayPrintFailed'));
+        }
+      }
+
+      await this.workspaceService.closeDay();
+      await this.loadData();
+    } catch (error) {
+      this.dayError.set(error instanceof Error ? error.message : this.lang.t('dashboard.dayActionFailed'));
+    } finally {
+      this.dayBusy.set(false);
+    }
+  }
+
   protected async saveCashOpening(): Promise<void> {
     const raw = this.cashAmountInput();
     const amount = typeof raw === 'number' ? raw : Number.parseFloat(raw);
@@ -786,8 +918,15 @@ export class DashboardPageComponent implements OnInit, OnDestroy {
     this.pendingQueueDepth.set(pendingQueueDepth);
     this.cashOpening.set(cashOpening);
     this.displayCurrency.set(settings?.currency?.trim() || cashOpening?.currency || 'DH');
+    // Only the running business day is shown, so starting a day clears the
+    // previous day's orders and counts from the table.
+    const dayOrders = orders.filter((order) =>
+      this.workspaceService.isInCurrentBusinessDay(
+        order.paidAt ?? order.lastUpdatedAt ?? order.createdAt ?? '',
+      ),
+    );
     this.sectionStats.set(
-      buildSectionStats(orders, {
+      buildSectionStats(dayOrders, {
         SUR_PLACE: this.lang.t('orders.channelSurPlace'),
         EMPORTER: this.lang.t('orders.channelEmporter'),
         LIVRAISON: this.lang.t('orders.channelLivraison'),

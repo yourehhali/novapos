@@ -4,6 +4,7 @@ import {
   BootstrapSession,
   BusinessSettings,
   CashOpening,
+  DaySession,
   Category,
   CompletedOrder,
   DashboardSummary,
@@ -48,6 +49,7 @@ export class RoxPosDbService extends Dexie {
   ticketCounters!: Table<TicketCounter, string>;
   posWsEvents!: Table<PosWsProcessedEvent, string>;
   posWsState!: Table<PosWsState, string>;
+  daySessions!: Table<DaySession, string>;
 
   constructor() {
     super('RoxPosDb');
@@ -160,6 +162,27 @@ export class RoxPosDbService extends Dexie {
       ticketCounters: 'key',
       posWsEvents: 'eventId, orderId, processedAt',
       posWsState: 'id',
+    });
+
+    this.version(8).stores({
+      sessionContext: 'id',
+      bootstrapSessions: 'branchId',
+      products: 'id, categoryId, name',
+      categories: 'id, name',
+      printers: 'id, target',
+      dashboard: 'branchId',
+      eventQueue: 'eventUuid, branchId, deviceId, localStatus, deviceSequence',
+      completedOrders: 'id, branchId, createdAt, channel, tableNumber, livreurId',
+      syncCursors: 'id',
+      reportPrintStates: 'id, branchId, reportType, lastPrintedAt',
+      businessSettings: 'id',
+      floorTables: 'id, number, zone, status',
+      deliveryDrivers: 'id, number, status',
+      cashOpenings: 'id, branchId, dayKey',
+      ticketCounters: 'key',
+      posWsEvents: 'eventId, orderId, processedAt',
+      posWsState: 'id',
+      daySessions: 'id, branchId',
     });
   }
 }

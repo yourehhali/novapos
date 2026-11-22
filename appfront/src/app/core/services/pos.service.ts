@@ -21,6 +21,7 @@ import { WorkspaceService } from './workspace.service';
 /** Machine-readable reasons an external order can be rejected outright. */
 export type ExternalOrderRejectionCode =
   | 'session_unavailable'
+  | 'day_closed'
   | 'empty_order'
   | 'unknown_product'
   | 'product_unavailable';
@@ -171,6 +172,15 @@ export class PosService {
     await this.db.deliveryDrivers.delete(id);
   }
 
+  /**
+   * True when the business day was closed from the dashboard and no order may
+   * be created until a new day is started.
+   */
+  async isDayLocked(): Promise<boolean> {
+    await this.workspace.refreshDaySession();
+    return this.workspace.dayLocked();
+  }
+
   private cashOpeningIdFor(branchId: string, dayKey: string): string {
     return `${branchId}-${dayKey}`;
   }
@@ -258,6 +268,10 @@ export class PosService {
     const user = this.session.user();
 
     if (!branch || !user || this.cart().length === 0) {
+      return null;
+    }
+
+    if (await this.isDayLocked()) {
       return null;
     }
 
@@ -421,6 +435,15 @@ export class PosService {
       return { ok: false, code: 'empty_order', message: 'La commande est vide.', productIds: [] };
     }
 
+    if (await this.isDayLocked()) {
+      return {
+        ok: false,
+        code: 'day_closed',
+        message: 'La journee est cloturee sur la caisse.',
+        productIds: [],
+      };
+    }
+
     const products = await this.db.products.toArray();
     const productMap = new Map(products.map((product) => [product.id, product]));
     const unknown: string[] = [];
@@ -466,6 +489,10 @@ export class PosService {
     const user = this.session.user();
     if (!branch || !user) {
       return null;
+    }
+
+    if (await this.isDayLocked()) {
+      throw new Error('La journee est cloturee sur la caisse. Demarrez une nouvelle journee.');
     }
 
     const products = await this.db.products.toArray();

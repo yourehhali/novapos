@@ -10,6 +10,7 @@ import {
 } from '../models/app.models';
 import { SessionService } from './session.service';
 import { extractOrderVat } from './pos.service';
+import { WorkspaceService } from './workspace.service';
 
 const CHANNEL_ORDER: OrderChannel[] = ['SUR_PLACE', 'EMPORTER', 'LIVRAISON'];
 
@@ -58,6 +59,7 @@ function buildVatBreakdown(orders: CompletedOrder[]): SalesSummaryVatLine[] {
 export class SalesSummaryService {
   private readonly db = inject(RoxPosDbService);
   private readonly session = inject(SessionService);
+  private readonly workspace = inject(WorkspaceService);
 
   async buildReport(range: SalesSummaryRange): Promise<SalesSummaryReport | null> {
     const branch = this.session.branch();
@@ -67,7 +69,8 @@ export class SalesSummaryService {
 
     const now = new Date();
     const state = await this.db.reportPrintStates.get(this.reportStateId(branch.branchId));
-    const fromAt = this.resolveFromAt(range, state?.lastPrintedAt, now);
+    const daySession = await this.workspace.refreshDaySession();
+    const fromAt = this.resolveFromAt(range, state?.lastPrintedAt, now, daySession?.startedAt);
     const toAt = now.toISOString();
 
     const orders = await this.db.completedOrders.where('branchId').equals(branch.branchId).toArray();
@@ -135,9 +138,20 @@ export class SalesSummaryService {
     return `${branchId}:sales-summary`;
   }
 
-  private resolveFromAt(range: SalesSummaryRange, lastPrintedAt: string | undefined, now: Date): string {
+  private resolveFromAt(
+    range: SalesSummaryRange,
+    lastPrintedAt: string | undefined,
+    now: Date,
+    dayStartedAt?: string,
+  ): string {
     if (range === 'LAST_REPORT' && lastPrintedAt) {
       return lastPrintedAt;
+    }
+
+    // When the day was started from the dashboard the report covers that
+    // session instead of the calendar day.
+    if (dayStartedAt) {
+      return dayStartedAt;
     }
 
     const dayStart = new Date(now);

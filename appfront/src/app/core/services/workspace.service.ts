@@ -1,10 +1,11 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, computed, inject, signal } from '@angular/core';
 import { Subject } from 'rxjs';
 import {
   BusinessSettings,
   CompletedOrder,
   Category,
   DashboardSummary,
+  DaySession,
   DemoSeedingMode,
   DeliveryDriver,
   FloorTable,
@@ -38,6 +39,7 @@ export class WorkspaceService {
   private readonly driversChangedSource = new Subject<void>();
   private readonly businessSettingsChangedSource = new Subject<void>();
   private readonly ordersChangedSource = new Subject<void>();
+  private readonly dayChangedSource = new Subject<void>();
 
   readonly catalogChanged$ = this.catalogChangedSource.asObservable();
   readonly tablesChanged$ = this.tablesChangedSource.asObservable();
@@ -45,6 +47,13 @@ export class WorkspaceService {
   readonly businessSettingsChanged$ = this.businessSettingsChangedSource.asObservable();
   /** Emitted whenever a completed order is created, edited or paid. */
   readonly ordersChanged$ = this.ordersChangedSource.asObservable();
+  /** Emitted when the business day is started or closed. */
+  readonly dayChanged$ = this.dayChangedSource.asObservable();
+
+  /** Current business day, or null when no day has been started yet. */
+  readonly daySession = signal<DaySession | null>(null);
+  /** True once "End day" ran: no order may be created until the next start. */
+  readonly dayLocked = computed(() => Boolean(this.daySession()?.closedAt));
 
   invalidateAllCaches(): void {
     this.catalogCache = null;
@@ -135,7 +144,83 @@ export class WorkspaceService {
     if (!branch) {
       return null;
     }
+    await this.refreshDaySession();
     return this.loadComputedDashboard(branch.branchId);
+  }
+
+  /**
+   * Opens a new business day. Everything counted on the dashboard starts from
+   * this instant, so the previous day's orders and totals drop off it, and the
+   * day is unlocked again.
+   */
+  async startDay(): Promise<DaySession | null> {
+    const branch = this.session.branch();
+    if (!branch) {
+      return null;
+    }
+
+    const session: DaySession = {
+      id: this.daySessionId(branch.branchId),
+      branchId: branch.branchId,
+      startedAt: new Date().toISOString(),
+    };
+
+    await this.db.daySessions.put(session);
+    this.daySession.set(session);
+    this.dayChangedSource.next();
+    return session;
+  }
+
+  /** Closes the current business day and locks order creation until the next start. */
+  async closeDay(): Promise<DaySession | null> {
+    const branch = this.session.branch();
+    if (!branch) {
+      return null;
+    }
+
+    const current = this.daySession() ?? await this.refreshDaySession();
+    const session: DaySession = {
+      id: this.daySessionId(branch.branchId),
+      branchId: branch.branchId,
+      startedAt: current?.startedAt ?? new Date().toISOString(),
+      closedAt: new Date().toISOString(),
+    };
+
+    await this.db.daySessions.put(session);
+    this.daySession.set(session);
+    this.dayChangedSource.next();
+    return session;
+  }
+
+  /** Reloads the current day session from storage and publishes it. */
+  async refreshDaySession(): Promise<DaySession | null> {
+    const branch = this.session.branch();
+    if (!branch) {
+      this.daySession.set(null);
+      return null;
+    }
+
+    const session = await this.db.daySessions.get(this.daySessionId(branch.branchId)) ?? null;
+    this.daySession.set(session);
+    return session;
+  }
+
+  /**
+   * True when the timestamp belongs to the running business day. Without a
+   * started day this falls back to the calendar business day, so terminals
+   * that never use Start/End day keep their previous behaviour.
+   */
+  isInCurrentBusinessDay(value: string): boolean {
+    const session = this.daySession();
+    if (!session) {
+      return this.isSameBusinessDay(value, this.session.branch()?.timezone ?? 'UTC');
+    }
+
+    if (value < session.startedAt) {
+      return false;
+    }
+
+    return !session.closedAt || value <= session.closedAt;
   }
 
   async loadPrinters(): Promise<PrinterConfig[]> {
@@ -245,7 +330,7 @@ export class WorkspaceService {
     const activeOrders = normalizedOrders.filter((order) => order.status === 'PREPARED').length;
     const paidToday = normalizedOrders
       .filter((order) => order.status === 'PAID')
-      .filter((order) => this.isSameBusinessDay(order.paidAt ?? order.lastUpdatedAt ?? order.createdAt, branch.timezone));
+      .filter((order) => this.isInCurrentBusinessDay(order.paidAt ?? order.lastUpdatedAt ?? order.createdAt));
     const revenueToday = paidToday.reduce((sum, order) => sum + order.total, 0);
     const revenueCashToday = paidToday
       .filter((order) => order.paymentMethod === 'CASH')
@@ -361,6 +446,10 @@ export class WorkspaceService {
     return `${branchId}:${deviceId}`;
   }
 
+  private daySessionId(branchId: string): string {
+    return `${branchId}:current-day`;
+  }
+
   async wipeAllLocalData(mode: DemoSeedingMode): Promise<void> {
     const db = this.db;
     const session = this.session;
@@ -376,6 +465,7 @@ export class WorkspaceService {
       db.reportPrintStates,
       db.dashboard,
       db.cashOpenings,
+      db.daySessions,
       db.sessionContext,
       db.bootstrapSessions,
       db.printers,
@@ -409,5 +499,6 @@ export class WorkspaceService {
     });
 
     this.invalidateAllCaches();
+    this.daySession.set(null);
   }
 }

@@ -138,6 +138,18 @@ export interface CashOpening {
   lastUpdatedAt: string;
 }
 
+/**
+ * The current business day. "Start day" opens a new session (the dashboard
+ * only shows orders from `startedAt` onwards); "End day" prints the daily
+ * ticket and stamps `closedAt`, which blocks new orders until the next start.
+ */
+export interface DaySession {
+  id: string;
+  branchId: string;
+  startedAt: string;
+  closedAt?: string;
+}
+
 export interface FloorTable {
   id: string;
   number: string;
@@ -519,6 +531,7 @@ export type PosWsOrderErrorCode =
   | 'unknown_product'
   | 'product_unavailable'
   | 'session_unavailable'
+  | 'day_closed'
   | 'pos_unavailable'
   | 'processing_timeout'
   | 'internal_error';

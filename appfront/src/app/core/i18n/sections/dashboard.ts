@@ -39,6 +39,14 @@ export const DASHBOARD_FR: Record<string, string> = {
   'dashboard.sectionName': 'Section',
   'dashboard.sectionOrders': 'Commandes',
   'dashboard.sectionRevenue': 'Recette',
+  'dashboard.startDay': 'Demarrer la journee',
+  'dashboard.endDay': 'Cloturer la journee',
+  'dashboard.dayWorking': 'Traitement...',
+  'dashboard.dayNotStarted': 'Journee non demarree',
+  'dashboard.dayOpenSince': 'Journee ouverte depuis {time}',
+  'dashboard.dayClosedAt': 'Journee cloturee a {time}',
+  'dashboard.dayPrintFailed': "L'impression du ticket de journee a echoue. La journee est cloturee.",
+  'dashboard.dayActionFailed': 'Operation impossible.',
 };
 
 export const DASHBOARD_DE: Record<string, string> = {
@@ -81,4 +89,12 @@ export const DASHBOARD_DE: Record<string, string> = {
   'dashboard.sectionName': 'Bereich',
   'dashboard.sectionOrders': 'Bestellungen',
   'dashboard.sectionRevenue': 'Umsatz',
+  'dashboard.startDay': 'Tag starten',
+  'dashboard.endDay': 'Tag abschliessen',
+  'dashboard.dayWorking': 'Verarbeitung...',
+  'dashboard.dayNotStarted': 'Tag nicht gestartet',
+  'dashboard.dayOpenSince': 'Tag offen seit {time}',
+  'dashboard.dayClosedAt': 'Tag abgeschlossen um {time}',
+  'dashboard.dayPrintFailed': 'Der Tagesbeleg konnte nicht gedruckt werden. Der Tag ist abgeschlossen.',
+  'dashboard.dayActionFailed': 'Aktion fehlgeschlagen.',
 };
