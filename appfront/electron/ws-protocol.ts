@@ -46,6 +46,7 @@ export type PosWsOrderErrorCode =
   | 'unknown_product'
   | 'product_unavailable'
   | 'session_unavailable'
+  | 'day_closed'
   | 'pos_unavailable'
   | 'processing_timeout'
   | 'internal_error';

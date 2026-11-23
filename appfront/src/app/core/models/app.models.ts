@@ -189,7 +189,7 @@ export interface CompletedOrder {
   paidAt?: string;
   lastUpdatedAt: string;
   version: number;
-  /** VAT rate already included in the prices (0.10 dine-in, 0.20 takeaway/delivery). */
+  /** VAT rate already included in the prices (0.20 for every sales channel). */
   vatRate: number;
   /** VAT amount extracted out of `total` (prices are VAT-inclusive). */
   vatAmount: number;
@@ -229,8 +229,7 @@ export interface SalesSummaryEntry {
 /**
  * VAT totals for one sales channel. Prices are VAT-inclusive, so `grossTotal`
  * is what was collected, `netTotal` excludes VAT and `vatAmount` is the VAT
- * extracted from it. The rate depends on the channel (10% dine-in, 20%
- * takeaway/delivery).
+ * extracted from it. The rate is 20% for every sales channel.
  */
 export interface SalesSummaryVatLine {
   channel: OrderChannel;

@@ -183,7 +183,7 @@ interface TicketOrder {
   livreurId?: string;
   customerPhone?: string;
   deliveryAddress?: string;
-  /** VAT rate included in the prices (0.10 dine-in, 0.20 takeaway/delivery). */
+  /** VAT rate included in the prices (0.20 for every sales channel). */
   vatRate?: number;
   /** VAT amount extracted out of `total`. */
   vatAmount?: number;

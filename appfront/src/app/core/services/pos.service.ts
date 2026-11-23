@@ -26,9 +26,9 @@ export type ExternalOrderRejectionCode =
   | 'unknown_product'
   | 'product_unavailable';
 
-/** VAT rates already included in the catalog prices, per sales channel. */
+/** VAT rates already included in the catalog prices, per sales channel (20% everywhere). */
 const VAT_RATE_BY_CHANNEL: Record<OrderChannel, number> = {
-  SUR_PLACE: 0.1,
+  SUR_PLACE: 0.2,
   EMPORTER: 0.2,
   LIVRAISON: 0.2,
 };

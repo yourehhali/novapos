@@ -1,17 +1,16 @@
 // @vitest-environment node
 //
 // VAT is included in the catalog prices (TTC), so it must be extracted out of
-// the order total, not added on top. Rates are set per sales channel:
-// 10% dine-in, 20% takeaway/delivery.
+// the order total, not added on top. The rate is 20% for every sales channel.
 import { describe, expect, it } from 'vitest';
 import { extractOrderVat } from './pos.service';
 
 describe('extractOrderVat', () => {
-  it('applies 10% for table orders', () => {
-    const vat = extractOrderVat('SUR_PLACE', 110);
-    expect(vat.vatRate).toBe(0.1);
+  it('applies 20% for table orders', () => {
+    const vat = extractOrderVat('SUR_PLACE', 120);
+    expect(vat.vatRate).toBe(0.2);
     expect(vat.netTotal).toBe(100);
-    expect(vat.vatAmount).toBe(10);
+    expect(vat.vatAmount).toBe(20);
   });
 
   it('applies 20% for takeaway orders', () => {
@@ -39,8 +38,8 @@ describe('extractOrderVat', () => {
 
   it('rounds both parts to cents so they still sum to the total', () => {
     const vat = extractOrderVat('SUR_PLACE', 100);
-    expect(vat.netTotal).toBe(90.91);
-    expect(vat.vatAmount).toBe(9.09);
+    expect(vat.netTotal).toBe(83.33);
+    expect(vat.vatAmount).toBe(16.67);
     expect(vat.netTotal + vat.vatAmount).toBe(100);
   });
 
