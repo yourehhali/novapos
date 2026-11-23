@@ -26,6 +26,8 @@ const SYNC_TIMEOUT_MS = 8000;
 const ORDER_TIMEOUT_MS = 20000;
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 60000;
+/** A connection must stay up this long before the reconnect backoff is reset. */
+const STABLE_CONNECTION_MS = 30000;
 const MAX_LOG_ENTRIES = 200;
 
 export type PosWsOrderResultPayload = PosWsOrderAckPayload | PosWsOrderErrorPayload;
@@ -84,6 +86,7 @@ export class PosWsClient {
 
   private state: PosWsConnectionState = 'DISCONNECTED';
   private connectedAt: string | null = null;
+  private connectedAtMs: number | null = null;
   private lastMessageAt: string | null = null;
   private lastError: string | null = null;
   private reconnectAttempt = 0;
@@ -150,6 +153,13 @@ export class PosWsClient {
       this.log('WARN', 'Intégration POS désactivée: aucun connexion ouverte.');
       return this.status();
     }
+    // Keep an already healthy connection. Recreating it makes the server see
+    // two logins at once and close one with code 1000, which the client then
+    // retries — the endless "auth success / 1000" loop.
+    if (this.transport?.isOpen()) {
+      this.log('INFO', 'Connexion WebSocket déjà active.');
+      return this.status();
+    }
     this.resetAndConnect('manual start');
     return this.status();
   }
@@ -157,9 +167,9 @@ export class PosWsClient {
   stop(): PosWsClientStatus {
     this.stoppedByUser = true;
     this.clearTimers();
-    this.transport?.close(1000, 'client stop');
-    this.transport = null;
+    this.closeTransport(1000, 'client stop');
     this.authenticating = false;
+    this.connectedAtMs = null;
     this.setState(this.config.enabled ? 'DISCONNECTED' : 'DISCONNECTED');
     this.log('INFO', 'Connexion WebSocket arrêtée.');
     return this.status();
@@ -179,12 +189,28 @@ export class PosWsClient {
 
   private resetAndConnect(reason: string): void {
     this.clearTimers();
-    this.transport?.close(1000, 'reconnect');
-    this.transport = null;
+    this.closeTransport(1000, 'reconnect');
     this.authenticating = false;
+    this.connectedAtMs = null;
     this.reconnectAttempt = 0;
     this.log('INFO', `Ouverture de la connexion WebSocket (${reason}).`);
     this.connect();
+  }
+
+  /**
+   * Closes the active transport without letting its `close` event run the
+   * reconnect logic. A client-initiated reconnect/stop must not look like a
+   * dropped connection, otherwise each close schedules a second reconnect and
+   * the client piles up duplicate, self-perpetuating 1000-close reconnects.
+   */
+  private closeTransport(code: number, reason: string): void {
+    const transport = this.transport;
+    this.transport = null;
+    if (!transport) {
+      return;
+    }
+    transport.removeAllListeners();
+    transport.close(code, reason);
   }
 
   private connect(): void {
@@ -216,9 +242,16 @@ export class PosWsClient {
     });
 
     transport.on('close', (info: { code: number; reason: string }) => {
+      // A transport that was already replaced (e.g. by a manual reconnect) must
+      // not tear down the live connection nor schedule another reconnect.
+      if (this.transport !== transport) {
+        return;
+      }
       this.transport = null;
       this.stopHeartbeat();
       this.authenticating = false;
+      const uptimeMs = this.connectedAtMs !== null ? Date.now() - this.connectedAtMs : 0;
+      this.connectedAtMs = null;
       this.connectedAt = null;
       if (this.stoppedByUser) {
         this.setState('DISCONNECTED');
@@ -227,6 +260,12 @@ export class PosWsClient {
       this.log('WARN', `Connexion fermée (${info.code}${info.reason ? ` ${info.reason}` : ''}).`);
       if (this.state === 'AUTH_ERROR') {
         return;
+      }
+      // Forget the backoff only once a connection proved stable; otherwise a
+      // server that accepts auth then closes normally would be reconnected to
+      // every second indefinitely.
+      if (uptimeMs >= STABLE_CONNECTION_MS) {
+        this.reconnectAttempt = 0;
       }
       this.setState('DISCONNECTED');
       this.scheduleReconnect();
@@ -308,8 +347,8 @@ export class PosWsClient {
 
   private onAuthSuccess(): void {
     this.authenticating = false;
-    this.reconnectAttempt = 0;
     this.connectedAt = new Date().toISOString();
+    this.connectedAtMs = Date.now();
     this.lastError = null;
     this.setState('CONNECTED');
     this.log('INFO', 'Authentification réussie.');
